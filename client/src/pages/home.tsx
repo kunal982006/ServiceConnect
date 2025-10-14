@@ -19,7 +19,9 @@ import {
   Percent,
   Sparkles,
   Share,
-  Phone
+  Phone,
+  Sandwich,
+  UtensilsCrossed
 } from "lucide-react";
 
 const services = [
@@ -70,6 +72,22 @@ const services = [
     description: "Find rental properties directly from owners",
     badge: "Zero Brokerage",
     color: "primary"
+  },
+  {
+    name: "Street Food",
+    slug: "street-food",
+    icon: Sandwich,
+    description: "Discover delicious street food vendors nearby",
+    badge: "Hot Deals",
+    color: "accent"
+  },
+  {
+    name: "Restaurants",
+    slug: "restaurants",
+    icon: UtensilsCrossed,
+    description: "Book tables and browse menus from top restaurants",
+    badge: "Reserve Now",
+    color: "destructive"
   }
 ];
 

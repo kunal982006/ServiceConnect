@@ -151,6 +151,47 @@ export const groceryOrders = pgTable("grocery_orders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Street food menu items
+export const streetFoodItems = pgTable("street_food_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // Chaat, Rolls, Momos, Beverages, etc.
+  imageUrl: text("image_url"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isVeg: boolean("is_veg").default(true),
+  isAvailable: boolean("is_available").default(true),
+  spicyLevel: text("spicy_level"), // Mild, Medium, Hot
+});
+
+// Restaurant menu items
+export const restaurantMenuItems = pgTable("restaurant_menu_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // Starters, Main Course, Desserts, Beverages
+  imageUrl: text("image_url"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isVeg: boolean("is_veg").default(true),
+  isAvailable: boolean("is_available").default(true),
+  cuisine: text("cuisine"), // Indian, Chinese, Italian, etc.
+});
+
+// Restaurant table bookings
+export const tableBookings = pgTable("table_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
+  date: timestamp("booking_date").notNull(),
+  timeSlot: text("time_slot").notNull(),
+  numberOfGuests: integer("number_of_guests").notNull(),
+  specialRequests: text("special_requests"),
+  status: text("status").default("pending"), // pending, confirmed, cancelled, completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Reviews
 export const reviews = pgTable("reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -184,6 +225,9 @@ export const serviceProvidersRelations = relations(serviceProviders, ({ one, man
   reviews: many(reviews),
   beautyServices: many(beautyServices),
   cakeProducts: many(cakeProducts),
+  streetFoodItems: many(streetFoodItems),
+  restaurantMenuItems: many(restaurantMenuItems),
+  tableBookings: many(tableBookings),
 }));
 
 export const bookingsRelations = relations(bookings, ({ one }) => ({
@@ -256,6 +300,13 @@ export const insertRentalPropertySchema = createInsertSchema(rentalProperties).p
   images: true,
 });
 
+export const insertTableBookingSchema = createInsertSchema(tableBookings).pick({
+  date: true,
+  timeSlot: true,
+  numberOfGuests: true,
+  specialRequests: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -272,4 +323,8 @@ export type ServiceProblem = typeof serviceProblems.$inferSelect;
 export type BeautyService = typeof beautyServices.$inferSelect;
 export type CakeProduct = typeof cakeProducts.$inferSelect;
 export type GroceryProduct = typeof groceryProducts.$inferSelect;
+export type StreetFoodItem = typeof streetFoodItems.$inferSelect;
+export type RestaurantMenuItem = typeof restaurantMenuItems.$inferSelect;
+export type TableBooking = typeof tableBookings.$inferSelect;
+export type InsertTableBooking = z.infer<typeof insertTableBookingSchema>;
 export type Review = typeof reviews.$inferSelect;

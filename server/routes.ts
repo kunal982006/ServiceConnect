@@ -7,6 +7,7 @@ import {
   insertBookingSchema, 
   insertGroceryOrderSchema, 
   insertRentalPropertySchema,
+  insertTableBookingSchema,
   insertUserSchema 
 } from "@shared/schema";
 
@@ -341,6 +342,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const reviews = await storage.getProviderReviews(req.params.providerId);
       res.json(reviews);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Street food items
+  app.get("/api/street-food-items", async (req, res) => {
+    try {
+      const { providerId } = req.query;
+      const items = await storage.getStreetFoodItems(providerId as string);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Restaurant menu items
+  app.get("/api/restaurant-menu-items", async (req, res) => {
+    try {
+      const { providerId } = req.query;
+      const items = await storage.getRestaurantMenuItems(providerId as string);
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Table bookings
+  app.post("/api/table-bookings", async (req, res) => {
+    try {
+      const validatedData = insertTableBookingSchema.parse(req.body);
+      const booking = await storage.createTableBooking({
+        ...validatedData,
+        userId: req.body.userId || "user-1", // TODO: Get from auth session
+        providerId: req.body.providerId,
+      });
+      res.json(booking);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/table-bookings/:id", async (req, res) => {
+    try {
+      const booking = await storage.getTableBooking(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/table-bookings/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      const booking = await storage.updateTableBookingStatus(req.params.id, status);
+      res.json(booking);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/table-bookings/user/:userId", async (req, res) => {
+    try {
+      const bookings = await storage.getUserTableBookings(req.params.userId);
+      res.json(bookings);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

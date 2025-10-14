@@ -11,6 +11,8 @@ import Beauty from "@/pages/beauty";
 import CakeShop from "@/pages/cake-shop";
 import Grocery from "@/pages/grocery";
 import Rental from "@/pages/rental";
+import StreetFood from "@/pages/street-food";
+import Restaurants from "@/pages/restaurants";
 import Checkout from "@/pages/checkout";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/cake-shop" component={CakeShop} />
       <Route path="/grocery" component={Grocery} />
       <Route path="/rental" component={Rental} />
+      <Route path="/street-food" component={StreetFood} />
+      <Route path="/restaurants" component={Restaurants} />
       <Route path="/checkout" component={Checkout} />
       <Route component={NotFound} />
     </Switch>

@@ -1,12 +1,12 @@
 import { 
   users, serviceProviders, serviceCategories, serviceProblems, 
   beautyServices, cakeProducts, groceryProducts, rentalProperties,
-  bookings, groceryOrders, reviews,
+  bookings, groceryOrders, reviews, streetFoodItems, restaurantMenuItems, tableBookings,
   type User, type InsertUser, type ServiceProvider, type InsertServiceProvider,
   type Booking, type InsertBooking, type GroceryOrder, type InsertGroceryOrder,
   type RentalProperty, type InsertRentalProperty, type ServiceCategory,
   type ServiceProblem, type BeautyService, type CakeProduct, type GroceryProduct,
-  type Review
+  type Review, type StreetFoodItem, type RestaurantMenuItem, type TableBooking, type InsertTableBooking
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
@@ -69,6 +69,18 @@ export interface IStorage {
   // Reviews
   createReview(review: { userId: string; providerId: string; bookingId?: string; rating: number; comment?: string }): Promise<Review>;
   getProviderReviews(providerId: string): Promise<(Review & { user: User })[]>;
+
+  // Street food items
+  getStreetFoodItems(providerId?: string): Promise<StreetFoodItem[]>;
+
+  // Restaurant menu items
+  getRestaurantMenuItems(providerId?: string): Promise<RestaurantMenuItem[]>;
+
+  // Table bookings
+  createTableBooking(booking: InsertTableBooking & { userId: string; providerId: string }): Promise<TableBooking>;
+  getTableBooking(id: string): Promise<TableBooking | undefined>;
+  updateTableBookingStatus(id: string, status: string): Promise<TableBooking>;
+  getUserTableBookings(userId: string): Promise<TableBooking[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -497,6 +509,43 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(reviews.createdAt));
 
     return results as any;
+  }
+
+  async getStreetFoodItems(providerId?: string): Promise<StreetFoodItem[]> {
+    if (providerId) {
+      return db.select().from(streetFoodItems).where(eq(streetFoodItems.providerId, providerId));
+    }
+    return db.select().from(streetFoodItems).where(eq(streetFoodItems.isAvailable, true));
+  }
+
+  async getRestaurantMenuItems(providerId?: string): Promise<RestaurantMenuItem[]> {
+    if (providerId) {
+      return db.select().from(restaurantMenuItems).where(eq(restaurantMenuItems.providerId, providerId));
+    }
+    return db.select().from(restaurantMenuItems).where(eq(restaurantMenuItems.isAvailable, true));
+  }
+
+  async createTableBooking(booking: InsertTableBooking & { userId: string; providerId: string }): Promise<TableBooking> {
+    const [newBooking] = await db.insert(tableBookings).values(booking).returning();
+    return newBooking;
+  }
+
+  async getTableBooking(id: string): Promise<TableBooking | undefined> {
+    const [booking] = await db.select().from(tableBookings).where(eq(tableBookings.id, id));
+    return booking;
+  }
+
+  async updateTableBookingStatus(id: string, status: string): Promise<TableBooking> {
+    const [booking] = await db
+      .update(tableBookings)
+      .set({ status })
+      .where(eq(tableBookings.id, id))
+      .returning();
+    return booking;
+  }
+
+  async getUserTableBookings(userId: string): Promise<TableBooking[]> {
+    return db.select().from(tableBookings).where(eq(tableBookings.userId, userId)).orderBy(desc(tableBookings.createdAt));
   }
 }
 

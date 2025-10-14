@@ -15,7 +15,9 @@ const services = [
   { name: "Beauty Parlor", href: "/beauty" },
   { name: "Cake Shop", href: "/cake-shop" },
   { name: "Grocery", href: "/grocery" },
-  { name: "No Brokerage", href: "/rental" }
+  { name: "No Brokerage", href: "/rental" },
+  { name: "Street Food", href: "/street-food" },
+  { name: "Restaurants", href: "/restaurants" }
 ];
 
 const socialLinks = [
@@ -59,10 +61,8 @@ export default function Footer() {
             <ul className="space-y-2">
               {quickLinks.map((link) => (
                 <li key={link.name}>
-                  <Link href={link.href}>
-                    <a className="text-muted-foreground hover:text-primary transition">
-                      {link.name}
-                    </a>
+                  <Link href={link.href} className="text-muted-foreground hover:text-primary transition">
+                    {link.name}
                   </Link>
                 </li>
               ))}
@@ -75,10 +75,8 @@ export default function Footer() {
             <ul className="space-y-2">
               {services.map((service) => (
                 <li key={service.name}>
-                  <Link href={service.href}>
-                    <a className="text-muted-foreground hover:text-primary transition">
-                      {service.name}
-                    </a>
+                  <Link href={service.href} className="text-muted-foreground hover:text-primary transition">
+                    {service.name}
                   </Link>
                 </li>
               ))}
@@ -112,20 +110,14 @@ export default function Footer() {
             © 2024 ServiceHub. All rights reserved.
           </p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link href="/privacy">
-              <a className="text-sm text-muted-foreground hover:text-primary transition">
-                Privacy Policy
-              </a>
+            <Link href="/privacy" className="text-sm text-muted-foreground hover:text-primary transition">
+              Privacy Policy
             </Link>
-            <Link href="/terms">
-              <a className="text-sm text-muted-foreground hover:text-primary transition">
-                Terms of Service
-              </a>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-primary transition">
+              Terms of Service
             </Link>
-            <Link href="/cookies">
-              <a className="text-sm text-muted-foreground hover:text-primary transition">
-                Cookie Policy
-              </a>
+            <Link href="/cookies" className="text-sm text-muted-foreground hover:text-primary transition">
+              Cookie Policy
             </Link>
           </div>
         </div>

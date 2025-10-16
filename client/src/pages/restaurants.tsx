@@ -66,7 +66,8 @@ export default function Restaurants() {
 
   const bookingMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest(`/api/table-bookings`, "POST", data);
+      const response = await apiRequest("POST", `/api/table-bookings`, data);
+      return response.json();
     },
     onSuccess: () => {
       toast({

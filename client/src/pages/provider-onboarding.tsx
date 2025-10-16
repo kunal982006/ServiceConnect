@@ -72,12 +72,8 @@ export default function ProviderOnboarding() {
           : [],
       };
       
-      return apiRequest("/api/provider/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profileData),
-        credentials: "include",
-      });
+      const response = await apiRequest("POST", "/api/provider/profile", profileData);
+      return response.json();
     },
     onSuccess: () => {
       toast({

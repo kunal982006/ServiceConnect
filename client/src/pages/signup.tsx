@@ -56,12 +56,8 @@ export default function Signup() {
   const signupMutation = useMutation({
     mutationFn: async (data: SignupFormValues) => {
       const { confirmPassword, ...signupData } = data;
-      return apiRequest("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signupData),
-        credentials: "include",
-      });
+      const response = await apiRequest("POST", "/api/auth/signup", signupData);
+      return response.json();
     },
     onSuccess: (data: any) => {
       toast({

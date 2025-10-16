@@ -13,8 +13,8 @@ const electricianProblems = [
       "Remote not working",
       "Power turning on/off frequently",
       "Frozen coils",
-      "High electricity consumption"
-    ]
+      "High electricity consumption",
+    ],
   },
   {
     device: "Refrigerator",
@@ -26,21 +26,20 @@ const electricianProblems = [
       "Frost build-up in freezer",
       "Fridge light not working",
       "Compressor issues",
-      "Door not closing properly"
-    ]
+      "Door not closing properly",
+    ],
   },
   {
     device: "Television (TV)",
     issues: [
       "No display / black screen",
       "No sound",
-      "Remote not working",
       "HDMI/AV ports not functioning",
       "TV turning on and off by itself",
       "Distorted image or colors",
       "Lines on the screen",
-      "Wall mount installation needed"
-    ]
+      "Wall mount installation needed",
+    ],
   },
   {
     device: "Water Heater (Geyser)",
@@ -51,8 +50,8 @@ const electricianProblems = [
       "Electrical tripping when turned on",
       "Low hot water pressure",
       "Foul smell from hot water",
-      "Thermostat not working"
-    ]
+      "Thermostat not working",
+    ],
   },
   {
     device: "Washing Machine",
@@ -61,8 +60,8 @@ const electricianProblems = [
       "Water not draining",
       "Door not opening",
       "Vibrating excessively",
-      "Leaking water"
-    ]
+      "Leaking water",
+    ],
   },
   {
     device: "Microwave Oven",
@@ -70,9 +69,9 @@ const electricianProblems = [
       "Not heating food",
       "Sparking inside",
       "Buttons not responding",
-      "Turntable not rotating"
-    ]
-  }
+      "Turntable not rotating",
+    ],
+  },
 ];
 
 async function seedElectricianProblems() {
@@ -87,14 +86,18 @@ async function seedElectricianProblems() {
       .limit(1);
 
     if (electricianCategory.length === 0) {
-      console.error("❌ Electrician category not found. Please run the main seed script first.");
+      console.error(
+        "❌ Electrician category not found. Please run the main seed script first.",
+      );
       process.exit(1);
     }
 
     const categoryId = electricianCategory[0].id;
 
     // Delete existing electrician problems
-    await db.delete(serviceProblems).where(eq(serviceProblems.categoryId, categoryId));
+    await db
+      .delete(serviceProblems)
+      .where(eq(serviceProblems.categoryId, categoryId));
     console.log("✅ Cleared existing electrician problems");
 
     // Insert device categories (parent problems)
@@ -104,7 +107,7 @@ async function seedElectricianProblems() {
         .values({
           categoryId,
           name: problem.device,
-          parentId: null
+          parentId: null,
         })
         .returning();
 
@@ -115,11 +118,13 @@ async function seedElectricianProblems() {
         await db.insert(serviceProblems).values({
           categoryId,
           name: issue,
-          parentId: parentProblem.id
+          parentId: parentProblem.id,
         });
       }
 
-      console.log(`   ✅ Added ${problem.issues.length} issues for ${problem.device}`);
+      console.log(
+        `   ✅ Added ${problem.issues.length} issues for ${problem.device}`,
+      );
     }
 
     console.log("✨ Electrician problems seeding completed successfully!");

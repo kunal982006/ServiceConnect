@@ -34,11 +34,8 @@ export default function ProviderDashboard() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
-      return apiRequest(`/api/bookings/${bookingId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, providerId }),
-      });
+      const response = await apiRequest("PATCH", `/api/bookings/${bookingId}/status`, { status, providerId });
+      return response.json();
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings/provider", providerId] });

@@ -88,11 +88,8 @@ export default function BookingSlotForm({
         status: "pending",
       };
 
-      return apiRequest("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingData),
-      });
+      const response = await apiRequest("POST", "/api/bookings", bookingData);
+      return response.json();
     },
     onSuccess: () => {
       toast({

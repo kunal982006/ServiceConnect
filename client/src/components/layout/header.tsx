@@ -3,27 +3,36 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/use-cart";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Network, 
   ShoppingCart, 
   User, 
   Menu, 
   X,
-  Phone,
-  Mail
+  LogOut,
+  Settings
 } from "lucide-react";
 
 export default function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { items } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const totalItems = items.reduce((total, item) => total + item.quantity, 0);
 
   const navigation = [
     { name: "Services", href: "/#services" },
-    { name: "My Bookings", href: "/my-bookings" },
-    { name: "Provider Dashboard", href: "/provider-dashboard" },
+    { name: "How It Works", href: "/#how-it-works" },
     { name: "Offers", href: "/#offers" }
   ];
 
@@ -79,16 +88,57 @@ export default function Header() {
             </Link>
 
             {/* User Menu */}
-            <Button 
-              variant="ghost" 
-              className="hidden sm:flex items-center space-x-2"
-              data-testid="button-user-menu"
-            >
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-primary-foreground" />
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="hidden sm:flex items-center space-x-2"
+                    data-testid="button-user-menu"
+                  >
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                    <span className="text-sm font-medium">{user?.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {user?.role === "provider" && (
+                    <DropdownMenuItem onClick={() => setLocation("/provider-dashboard")}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Provider Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setLocation("/my-bookings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    My Bookings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout} data-testid="button-logout">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="hidden sm:flex items-center space-x-2">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setLocation("/login")}
+                  data-testid="button-login"
+                >
+                  Login
+                </Button>
+                <Button 
+                  onClick={() => setLocation("/signup")}
+                  data-testid="button-signup"
+                >
+                  Sign Up
+                </Button>
               </div>
-              <span className="text-sm font-medium">John Doe</span>
-            </Button>
+            )}
 
             {/* Mobile Menu Toggle */}
             <Button

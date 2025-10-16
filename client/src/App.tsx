@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Electrician from "@/pages/electrician";
+import ElectricianDetail from "@/pages/electrician-detail";
 import Plumber from "@/pages/plumber";
 import Beauty from "@/pages/beauty";
 import CakeShop from "@/pages/cake-shop";
@@ -21,6 +22,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/electrician/:id" component={ElectricianDetail} />
       <Route path="/electrician" component={Electrician} />
       <Route path="/plumber" component={Plumber} />
       <Route path="/beauty" component={Beauty} />

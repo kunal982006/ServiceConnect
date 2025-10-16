@@ -20,11 +20,15 @@ Preferred communication style: Simple, everyday language.
 - **Notification System**: Provider dashboard for accepting/declining bookings, customer booking status page
 - **Routes Added**: `/electrician/:id`, `/provider-dashboard`, `/my-bookings`
 
-### Twilio Integration Status
-- **Status**: Deferred - User dismissed Twilio connector setup
-- **Note**: Phone notification infrastructure is in place (routes `/api/call-request`, `/api/call-webhook`, `/api/call-response`)
-- **To Activate**: Add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` environment variables
-- **Alternative**: System currently uses in-app notifications (provider dashboard + customer bookings page)
+### Twilio SMS Notification System (Added: 2025-10-16)
+- **Status**: Active - Twilio connection configured successfully
+- **Implementation**: SMS notifications sent automatically when providers accept/decline bookings
+- **Features**: 
+  - Provider accepts booking → Customer receives SMS with confirmation and scheduled date
+  - Provider declines booking → Customer receives SMS suggesting to find another provider
+  - Phone number validation with country code requirement in booking form
+- **Technical**: Custom `server/twilio-client.ts` utility using Replit Twilio connection
+- **Fallback**: In-app notifications available on provider dashboard and customer bookings page
 
 ## System Architecture
 

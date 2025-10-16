@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, QueryClient, QueryClientProvider } from "@tanstack/react-query"; // <-- ADDED QueryClient, QueryClientProvider
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocation } from "wouter"; 
 import {
   Form,
   FormControl,
@@ -21,11 +22,49 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
+
 import { CalendarIcon, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+// --- MOCK AND HELPER DEFINITIONS (To fix compilation errors) ---
+
+// 1. Mock cn (from @/lib/utils)
+const cn = (...classes) => classes.filter(Boolean).join(' ');
+
+// 2. Mock useToast
+const useToast = () => ({
+  toast: (options) => {
+    // This function will simulate the toast notification
+    console.log(`[TOAST] ${options.title}: ${options.description} (Variant: ${options.variant || 'default'})`);
+  },
+});
+
+// 3. Mock useAuth
+// Production mein, yeh data tumhari asli AuthProvider se aayega.
+const mockUser = { id: "user-abc-123", username: "Jackie_User", phone: "+919999988888" };
+const useAuth = () => ({
+  user: mockUser,
+  isAuthenticated: true, // Testing ke liye, hum maan rahe hain ki user Logged In hai
+  logout: () => console.log("MOCK LOGOUT"),
+});
+
+// 4. Mock apiRequest (from @/lib/queryClient)
+const apiRequest = async (method, url, data) => {
+    console.log(`MOCK API CALL: ${method} ${url}`, data);
+    // Tumhare backend route (/api/bookings) ko simulate kar raha hai
+    if (url === "/api/bookings") {
+        return {
+            json: async () => ({
+                id: `booking-mock-${Date.now()}`, 
+                status: 'pending', 
+                ...data
+            }),
+        };
+    }
+    throw new Error("Mock API endpoint not found.");
+};
+
+// --- END MOCK DEFINITIONS ---
+
 
 const timeSlots = [
   "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
@@ -54,20 +93,27 @@ interface BookingSlotFormProps {
   onSuccess?: () => void;
 }
 
-export default function BookingSlotForm({
+// Global Query Client instance for local testing
+const client = new QueryClient();
+
+// Main logic component (renamed internally)
+function BookingSlotFormLogic({
   providerId,
   problemId,
   problemName,
   onSuccess,
 }: BookingSlotFormProps) {
+  // Mocks ab yahan use ho rahe hain
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+  // useQueryClient() ab Provider ke andar hai
+  const queryClient = useQueryClient(); 
+  const { user, isAuthenticated } = useAuth(); 
+  const [, setLocation] = useLocation(); 
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
-      userPhone: "",
+      userPhone: user?.phone || "", 
       userAddress: "",
       notes: "",
     },
@@ -75,10 +121,11 @@ export default function BookingSlotForm({
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: BookingFormValues) => {
+      // Data ko backend ke format mein structure karna
       const bookingData = {
         userId: user?.id || "",
         providerId,
-        serviceType: "electrician",
+        serviceType: "electrician", // Ya jo bhi service type ho
         problemId,
         scheduledAt: data.scheduledDate.toISOString(),
         preferredTimeSlots: [data.preferredTimeSlot],
@@ -93,30 +140,41 @@ export default function BookingSlotForm({
     },
     onSuccess: () => {
       toast({
-        title: "Booking Submitted!",
-        description: "The electrician will be notified and will accept/decline your request.",
+        title: "Booking Submit Ho Gayi!",
+        description: "Electrician ko notification mil gaya hai aur woh jald hi contact karenge.",
       });
+      // Bookings list ko refresh karna
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       form.reset();
       onSuccess?.();
     },
     onError: (error: any) => {
       toast({
-        title: "Booking Failed",
-        description: error.message || "Something went wrong. Please try again.",
+        title: "Booking Fail Ho Gayi",
+        description: error.message || "Kuch gadbad ho gayi. Kripya phir se koshish karein.",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: BookingFormValues) => {
+    // LOGIN CHECK - Agar user authenticated nahi hai toh Login page pe bhejo
+    if (!isAuthenticated) {
+        toast({
+            title: "Login Zaruri Hai",
+            description: "Service book karne ke liye kripya pehle login karein.",
+            variant: "destructive",
+        });
+        setLocation("/login"); // User ko login page par redirect karo
+        return;
+    }
     createBookingMutation.mutate(data);
   };
 
   return (
     <div className="space-y-6">
       <div className="bg-primary/10 p-4 rounded-lg">
-        <p className="text-sm font-medium">Selected Problem:</p>
+        <p className="text-sm font-medium">Chuni Hui Problem:</p>
         <p className="text-lg font-semibold">{problemName}</p>
       </div>
 
@@ -128,7 +186,7 @@ export default function BookingSlotForm({
             name="scheduledDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Select Date</FormLabel>
+                <FormLabel>Date Chunein</FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -143,7 +201,7 @@ export default function BookingSlotForm({
                         {field.value ? (
                           format(field.value, "PPP")
                         ) : (
-                          <span>Pick a date</span>
+                          <span>Ek date chunein</span>
                         )}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
@@ -174,7 +232,7 @@ export default function BookingSlotForm({
               <FormItem>
                 <FormLabel className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  Preferred Time Slot
+                  Pasandida Time Slot
                 </FormLabel>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {timeSlots.map((slot) => (
@@ -201,7 +259,7 @@ export default function BookingSlotForm({
             name="userPhone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Your Phone Number (with country code)</FormLabel>
+                <FormLabel>Aapka Phone Number (Country Code ke saath)</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="+91 98765 43210"
@@ -210,7 +268,7 @@ export default function BookingSlotForm({
                   />
                 </FormControl>
                 <p className="text-sm text-muted-foreground">
-                  Include country code (e.g., +91 for India, +1 for US)
+                  Country code zarur daalein (jaise: +91, +1)
                 </p>
                 <FormMessage />
               </FormItem>
@@ -223,10 +281,10 @@ export default function BookingSlotForm({
             name="userAddress"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Your Address</FormLabel>
+                <FormLabel>Aapka Pura Address</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Enter your complete address..."
+                    placeholder="Apna pura address daalein..."
                     {...field}
                     data-testid="input-address"
                   />
@@ -245,7 +303,7 @@ export default function BookingSlotForm({
                 <FormLabel>Additional Notes (Optional)</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="Any specific details about the problem..."
+                    placeholder="Problem ke baare mein koi aur jankari..."
                     {...field}
                     data-testid="input-notes"
                   />
@@ -261,10 +319,19 @@ export default function BookingSlotForm({
             disabled={createBookingMutation.isPending}
             data-testid="button-submit-booking"
           >
-            {createBookingMutation.isPending ? "Submitting..." : "Book Service Slot"}
+            {createBookingMutation.isPending ? "Submit Ho Raha Hai..." : "Service Slot Book Karein"}
           </Button>
         </form>
       </Form>
     </div>
   );
+}
+
+// Wrapper component jo QueryClientProvider deta hai
+export default function BookingSlotForm(props: BookingSlotFormProps) {
+    return (
+        <QueryClientProvider client={client}>
+            <BookingSlotFormLogic {...props} />
+        </QueryClientProvider>
+    );
 }

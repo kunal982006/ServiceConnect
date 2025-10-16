@@ -63,6 +63,19 @@ export default function Header() {
                 {item.name}
               </a>
             ))}
+            {/* NEW: My Bookings Link for Authenticated Users */}
+            {isAuthenticated && (
+              <Link
+                href="/my-bookings"
+                className={`font-medium transition ${
+                  location === "/my-bookings"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-primary"
+                }`}
+              >
+                My Bookings
+              </Link>
+            )}
           </nav>
 
           {/* Right Side Actions */}
@@ -172,11 +185,34 @@ export default function Header() {
                 {item.name}
               </a>
             ))}
+            {isAuthenticated && (
+              <Link
+                href="/my-bookings"
+                className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-primary hover:bg-muted rounded-md"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                My Bookings
+              </Link>
+            )}
             <div className="px-3 py-2">
-              <Button className="w-full flex items-center space-x-2">
-                <User className="h-4 w-4" />
-                <span>Sign In</span>
-              </Button>
+              {isAuthenticated ? (
+                <Button 
+                  className="w-full flex items-center space-x-2"
+                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  variant="outline" // Changed variant for logout button
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout ({user?.username})</span>
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full flex items-center space-x-2"
+                  onClick={() => { setLocation("/login"); setMobileMenuOpen(false); }}
+                >
+                  <User className="h-4 w-4" />
+                  <span>Sign In</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>

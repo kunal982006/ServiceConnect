@@ -17,6 +17,9 @@ import Restaurants from "@/pages/restaurants";
 import Checkout from "@/pages/checkout";
 import ProviderDashboard from "@/pages/provider-dashboard";
 import MyBookings from "@/pages/my-bookings";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+import ProviderOnboarding from "@/pages/provider-onboarding";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 
@@ -36,6 +39,9 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/provider-dashboard" component={ProviderDashboard} />
       <Route path="/my-bookings" component={MyBookings} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/provider-onboarding" component={ProviderOnboarding} />
       <Route component={NotFound} />
     </Switch>
   );

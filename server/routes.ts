@@ -196,6 +196,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status, 
         providerId
       );
+
+      // Send SMS notification to customer
+      if (booking && booking.userPhone && (status === 'accepted' || status === 'declined')) {
+        try {
+          const { sendBookingNotification } = await import('./twilio-client.js');
+          const providerName = booking.provider?.businessName || 'The service provider';
+          const scheduledDate = booking.scheduledAt 
+            ? new Date(booking.scheduledAt).toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })
+            : undefined;
+
+          await sendBookingNotification(
+            booking.userPhone,
+            status,
+            providerName,
+            scheduledDate
+          );
+        } catch (smsError) {
+          console.error('Failed to send SMS notification:', smsError);
+          // Don't fail the request if SMS fails
+        }
+      }
+
       res.json(booking);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

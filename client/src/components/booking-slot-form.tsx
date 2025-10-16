@@ -33,7 +33,9 @@ const timeSlots = [
 ];
 
 const bookingSchema = z.object({
-  userPhone: z.string().min(10, "Phone number must be at least 10 digits"),
+  userPhone: z.string()
+    .min(10, "Phone number must be at least 10 digits")
+    .regex(/^[+]?[\d\s()-]+$/, "Please enter a valid phone number with country code (e.g., +1234567890)"),
   userAddress: z.string().min(5, "Address is required"),
   scheduledDate: z.date({
     required_error: "Please select a date",
@@ -200,7 +202,7 @@ export default function BookingSlotForm({
             name="userPhone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Your Phone Number</FormLabel>
+                <FormLabel>Your Phone Number (with country code)</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="+91 98765 43210"
@@ -208,6 +210,9 @@ export default function BookingSlotForm({
                     data-testid="input-phone"
                   />
                 </FormControl>
+                <p className="text-sm text-muted-foreground">
+                  Include country code (e.g., +91 for India, +1 for US)
+                </p>
                 <FormMessage />
               </FormItem>
             )}

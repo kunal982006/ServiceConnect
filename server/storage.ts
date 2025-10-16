@@ -57,7 +57,7 @@ export interface IStorage {
   // Bookings
   createBooking(booking: InsertBooking & { userId: string; providerId?: string }): Promise<Booking>;
   getBooking(id: string): Promise<(Booking & { user: User; provider?: ServiceProvider }) | undefined>;
-  updateBookingStatus(id: string, status: string, providerId?: string): Promise<Booking>;
+  updateBookingStatus(id: string, status: string, providerId?: string): Promise<Booking & { provider?: ServiceProvider }>;
   getUserBookings(userId: string): Promise<(Booking & { provider?: ServiceProvider })[]>;
   getProviderBookings(providerId: string): Promise<(Booking & { user: User })[]>;
 
@@ -208,7 +208,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createServiceProvider(provider: InsertServiceProvider & { userId: string; categoryId: string }): Promise<ServiceProvider> {
-    const [newProvider] = await db.insert(serviceProviders).values([provider]).returning();
+    const [newProvider] = await db.insert(serviceProviders).values(provider).returning();
     return newProvider;
   }
 
@@ -355,12 +355,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRentalProperty(property: InsertRentalProperty & { ownerId: string }): Promise<RentalProperty> {
-    const [newProperty] = await db.insert(rentalProperties).values([property]).returning();
+    const [newProperty] = await db.insert(rentalProperties).values(property).returning();
     return newProperty;
   }
 
   async createBooking(booking: InsertBooking & { userId: string; providerId?: string }): Promise<Booking> {
-    const [newBooking] = await db.insert(bookings).values([booking]).returning();
+    const [newBooking] = await db.insert(bookings).values(booking).returning();
     return newBooking;
   }
 
@@ -391,7 +391,7 @@ export class DatabaseStorage implements IStorage {
     return result as any;
   }
 
-  async updateBookingStatus(id: string, status: string, providerId?: string): Promise<Booking> {
+  async updateBookingStatus(id: string, status: string, providerId?: string): Promise<Booking & { provider?: ServiceProvider }> {
     const updateData: any = { status };
     if (providerId) {
       updateData.providerId = providerId;
@@ -402,6 +402,15 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(eq(bookings.id, id))
       .returning();
+
+    // Fetch provider details if providerId exists
+    if (booking.providerId) {
+      const provider = await db.query.serviceProviders.findFirst({
+        where: eq(serviceProviders.id, booking.providerId),
+      });
+      return { ...booking, provider };
+    }
+
     return booking;
   }
 

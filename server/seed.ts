@@ -1,6 +1,7 @@
 import { db } from "./db";
+import bcrypt from "bcrypt";
 import { 
-  users, serviceCategories, serviceProviders, 
+  users, serviceCategories, serviceProviders, serviceProblems,
   streetFoodItems, restaurantMenuItems, groceryProducts
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
@@ -23,76 +24,268 @@ async function seed() {
 
     console.log(`✅ Created ${categories.length} service categories`);
 
-    // Create sample users
+    const hashedPassword = await bcrypt.hash("password123", 10);
+
+    // Create sample users for all service providers
     const sampleUsers = await db.insert(users).values([
-      { 
-        username: "vendor1", 
-        email: "vendor1@servicehub.com", 
-        password: "hashed_password_123",
-        role: "provider",
-        phone: "+91-9876543210"
-      },
-      { 
-        username: "vendor2", 
-        email: "vendor2@servicehub.com", 
-        password: "hashed_password_123",
-        role: "provider",
-        phone: "+91-9876543211"
-      },
-      { 
-        username: "restaurant1", 
-        email: "restaurant1@servicehub.com", 
-        password: "hashed_password_123",
-        role: "provider",
-        phone: "+91-9876543212"
-      },
+      // Electricians
+      { username: "rajesh_electrician", email: "rajesh.electrician@example.com", password: hashedPassword, role: "provider", phone: "+919876543210" },
+      { username: "amit_electrical", email: "amit.electrical@example.com", password: hashedPassword, role: "provider", phone: "+919876543211" },
+      { username: "suresh_repairs", email: "suresh.repairs@example.com", password: hashedPassword, role: "provider", phone: "+919876543212" },
+      
+      // Plumbers
+      { username: "vikram_plumber", email: "vikram.plumber@example.com", password: hashedPassword, role: "provider", phone: "+919876543213" },
+      { username: "rahul_plumbing", email: "rahul.plumbing@example.com", password: hashedPassword, role: "provider", phone: "+919876543214" },
+      
+      // Beauty Parlors
+      { username: "priya_beauty", email: "priya.beauty@example.com", password: hashedPassword, role: "provider", phone: "+919876543215" },
+      { username: "sonal_salon", email: "sonal.salon@example.com", password: hashedPassword, role: "provider", phone: "+919876543216" },
+      
+      // Cake Shops
+      { username: "sweetdreams_cakes", email: "sweetdreams@example.com", password: hashedPassword, role: "provider", phone: "+919876543217" },
+      { username: "cakehub_delights", email: "cakehub@example.com", password: hashedPassword, role: "provider", phone: "+919876543218" },
+      
+      // Street Food
+      { username: "chacha_chaat", email: "chacha.chaat@example.com", password: hashedPassword, role: "provider", phone: "+919876543219" },
+      { username: "momos_king", email: "momos.king@example.com", password: hashedPassword, role: "provider", phone: "+919876543220" },
+      
+      // Restaurants
+      { username: "punjabi_dhaba", email: "punjabi.dhaba@example.com", password: hashedPassword, role: "provider", phone: "+919876543221" },
+      { username: "chinese_wok", email: "chinese.wok@example.com", password: hashedPassword, role: "provider", phone: "+919876543222" },
     ]).onConflictDoNothing().returning();
 
     console.log(`✅ Created ${sampleUsers.length} sample users`);
 
     // Get category IDs
-    const streetFoodCategory = categories.find(c => c.slug === "street-food");
-    const restaurantCategory = categories.find(c => c.slug === "restaurants");
+    const electricianCat = categories.find(c => c.slug === "electrician");
+    const plumberCat = categories.find(c => c.slug === "plumber");
+    const beautyCat = categories.find(c => c.slug === "beauty");
+    const cakeCat = categories.find(c => c.slug === "cake-shop");
+    const streetFoodCat = categories.find(c => c.slug === "street-food");
+    const restaurantCat = categories.find(c => c.slug === "restaurants");
 
-    if (streetFoodCategory && sampleUsers.length > 0) {
-      // Create street food vendors
-      const streetFoodVendors = await db.insert(serviceProviders).values([
+    // Create service providers
+    const providers = [];
+
+    // Electrician providers
+    if (electricianCat && sampleUsers.length >= 3) {
+      const electricians = await db.insert(serviceProviders).values([
         {
           userId: sampleUsers[0].id,
-          categoryId: streetFoodCategory.id,
-          businessName: "Chaat Corner",
-          description: "Authentic North Indian street food with a modern twist",
-          address: "MG Road, Bangalore",
-          latitude: "12.9716",
-          longitude: "77.5946",
-          rating: "4.5",
+          categoryId: electricianCat.id,
+          businessName: "Rajesh Electrical Works",
+          description: "Expert in AC, refrigerator, and TV repairs with 15 years of experience. 24/7 emergency service available.",
+          experience: 15,
+          address: "Shop 12, Malviya Nagar, Delhi",
+          latitude: "28.5355",
+          longitude: "77.2090",
+          rating: "4.8",
           reviewCount: 127,
+          serviceArea: 15,
           isVerified: true,
           isAvailable: true,
-          specializations: ["Chaat", "Pani Puri", "Bhel Puri"],
+          specializations: ["AC Repair", "Refrigerator", "TV Repair", "Microwave"],
         },
         {
           userId: sampleUsers[1].id,
-          categoryId: streetFoodCategory.id,
-          businessName: "Momos King",
-          description: "Steamed and fried momos with variety of fillings",
-          address: "Indiranagar, Bangalore",
-          latitude: "12.9719",
-          longitude: "77.6412",
-          rating: "4.7",
+          categoryId: electricianCat.id,
+          businessName: "Amit Electronics Repair",
+          description: "Specialized in washing machine and microwave repairs. Quick and reliable service.",
+          experience: 10,
+          address: "Sector 18, Noida",
+          latitude: "28.5678",
+          longitude: "77.3249",
+          rating: "4.6",
           reviewCount: 89,
+          serviceArea: 12,
           isVerified: true,
           isAvailable: true,
-          specializations: ["Momos", "Dumplings", "Noodles"],
+          specializations: ["Washing Machine", "Microwave", "Dishwasher", "Water Heater"],
+        },
+        {
+          userId: sampleUsers[2].id,
+          categoryId: electricianCat.id,
+          businessName: "Suresh Home Appliances",
+          description: "Water heater installation and all home appliance repairs at affordable rates.",
+          experience: 8,
+          address: "Tilak Nagar, Delhi",
+          latitude: "28.6412",
+          longitude: "77.0912",
+          rating: "4.7",
+          reviewCount: 56,
+          serviceArea: 10,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Water Heater", "AC", "All Appliances"],
         },
       ]).onConflictDoNothing().returning();
+      providers.push(...electricians);
+      console.log(`✅ Created ${electricians.length} electrician providers`);
+    }
 
+    // Plumber providers
+    if (plumberCat && sampleUsers.length >= 5) {
+      const plumbers = await db.insert(serviceProviders).values([
+        {
+          userId: sampleUsers[3].id,
+          categoryId: plumberCat.id,
+          businessName: "Vikram Plumbing Services",
+          description: "24/7 emergency plumbing services. Pipe leaks, blockages, and bathroom fittings specialist.",
+          experience: 12,
+          address: "Dwarka Sector 10, Delhi",
+          latitude: "28.5921",
+          longitude: "77.0460",
+          rating: "4.7",
+          reviewCount: 98,
+          serviceArea: 12,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Pipe Repair", "Drain Cleaning", "Bathroom Fitting"],
+        },
+        {
+          userId: sampleUsers[4].id,
+          categoryId: plumberCat.id,
+          businessName: "Rahul Quick Fix Plumbing",
+          description: "Expert in tap repairs, drain cleaning, and water tank installation. Same day service.",
+          experience: 8,
+          address: "Rohini Sector 15, Delhi",
+          latitude: "28.7417",
+          longitude: "77.1025",
+          rating: "4.5",
+          reviewCount: 67,
+          serviceArea: 10,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Tap Repair", "Tank Installation", "Emergency Service"],
+        },
+      ]).onConflictDoNothing().returning();
+      providers.push(...plumbers);
+      console.log(`✅ Created ${plumbers.length} plumber providers`);
+    }
+
+    // Beauty parlor providers
+    if (beautyCat && sampleUsers.length >= 7) {
+      const beautyProviders = await db.insert(serviceProviders).values([
+        {
+          userId: sampleUsers[5].id,
+          categoryId: beautyCat.id,
+          businessName: "Priya's Beauty Lounge",
+          description: "Premium beauty services - Hair, Makeup, Spa, and Bridal packages. Experienced beauticians.",
+          experience: 10,
+          address: "Karol Bagh, Delhi",
+          latitude: "28.6519",
+          longitude: "77.1900",
+          rating: "4.9",
+          reviewCount: 156,
+          serviceArea: 10,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Hair Styling", "Bridal Makeup", "Spa", "Facial"],
+        },
+        {
+          userId: sampleUsers[6].id,
+          categoryId: beautyCat.id,
+          businessName: "Sonal Unisex Salon",
+          description: "Complete beauty solutions for men and women. Expert stylists and modern equipment.",
+          experience: 7,
+          address: "Lajpat Nagar, Delhi",
+          latitude: "28.5677",
+          longitude: "77.2430",
+          rating: "4.6",
+          reviewCount: 92,
+          serviceArea: 8,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Hair Cut", "Facial", "Makeup", "Manicure"],
+        },
+      ]).onConflictDoNothing().returning();
+      providers.push(...beautyProviders);
+      console.log(`✅ Created ${beautyProviders.length} beauty parlor providers`);
+    }
+
+    // Cake shop providers
+    if (cakeCat && sampleUsers.length >= 9) {
+      const cakeShops = await db.insert(serviceProviders).values([
+        {
+          userId: sampleUsers[7].id,
+          categoryId: cakeCat.id,
+          businessName: "Sweet Dreams Bakery",
+          description: "Custom cakes for birthdays, anniversaries, and weddings. Eggless options available.",
+          experience: 8,
+          address: "Connaught Place, Delhi",
+          latitude: "28.6304",
+          longitude: "77.2177",
+          rating: "4.8",
+          reviewCount: 234,
+          serviceArea: 20,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Birthday Cakes", "Wedding Cakes", "Eggless", "Custom Design"],
+        },
+        {
+          userId: sampleUsers[8].id,
+          categoryId: cakeCat.id,
+          businessName: "Cake Hub & Delights",
+          description: "Delicious designer cakes and cupcakes. Same-day delivery available for select items.",
+          experience: 5,
+          address: "Saket, Delhi",
+          latitude: "28.5244",
+          longitude: "77.2066",
+          rating: "4.7",
+          reviewCount: 178,
+          serviceArea: 15,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Designer Cakes", "Cupcakes", "Fast Delivery", "Photo Cakes"],
+        },
+      ]).onConflictDoNothing().returning();
+      providers.push(...cakeShops);
+      console.log(`✅ Created ${cakeShops.length} cake shop providers`);
+    }
+
+    // Street food vendors
+    if (streetFoodCat && sampleUsers.length >= 11) {
+      const streetFoodVendors = await db.insert(serviceProviders).values([
+        {
+          userId: sampleUsers[9].id,
+          categoryId: streetFoodCat.id,
+          businessName: "Chacha's Chaat Corner",
+          description: "Famous for Pani Puri, Bhel Puri, and Papdi Chaat. 25 years of authentic street food experience.",
+          experience: 25,
+          address: "Chandni Chowk, Delhi",
+          latitude: "28.6507",
+          longitude: "77.2334",
+          rating: "4.9",
+          reviewCount: 567,
+          serviceArea: 5,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Pani Puri", "Bhel Puri", "Chaat", "Papdi"],
+        },
+        {
+          userId: sampleUsers[10].id,
+          categoryId: streetFoodCat.id,
+          businessName: "Momos King",
+          description: "Steamed and fried momos with special sauces. Fresh made daily with hygiene standards.",
+          experience: 6,
+          address: "Nehru Place, Delhi",
+          latitude: "28.5494",
+          longitude: "77.2501",
+          rating: "4.6",
+          reviewCount: 345,
+          serviceArea: 5,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Momos", "Spring Rolls", "Fried Snacks"],
+        },
+      ]).onConflictDoNothing().returning();
+      providers.push(...streetFoodVendors);
       console.log(`✅ Created ${streetFoodVendors.length} street food vendors`);
 
       // Add street food items
       if (streetFoodVendors.length > 0) {
         const streetFoodMenuItems = await db.insert(streetFoodItems).values([
-          // Chaat Corner items
+          // Chacha's Chaat Corner items
           {
             providerId: streetFoodVendors[0].id,
             name: "Pani Puri",
@@ -115,10 +308,10 @@ async function seed() {
           },
           {
             providerId: streetFoodVendors[0].id,
-            name: "Sev Puri",
-            description: "Crispy puris topped with potatoes, sev, and chutneys",
+            name: "Papdi Chaat",
+            description: "Crispy wafers topped with yogurt, chutneys, and sev",
             category: "Chaat",
-            price: "45",
+            price: "60",
             isVeg: true,
             isAvailable: true,
             spicyLevel: "Medium",
@@ -160,45 +353,49 @@ async function seed() {
       }
     }
 
-    if (restaurantCategory && sampleUsers.length > 2) {
-      // Create restaurants
+    // Restaurant providers
+    if (restaurantCat && sampleUsers.length >= 13) {
       const restaurants = await db.insert(serviceProviders).values([
         {
-          userId: sampleUsers[2].id,
-          categoryId: restaurantCategory.id,
-          businessName: "Spice Garden",
-          description: "Fine dining with authentic Indian cuisine",
-          address: "Koramangala, Bangalore",
-          latitude: "12.9352",
-          longitude: "77.6245",
-          rating: "4.8",
-          reviewCount: 245,
+          userId: sampleUsers[11].id,
+          categoryId: restaurantCat.id,
+          businessName: "Punjabi Dhaba Restaurant",
+          description: "Authentic Punjabi cuisine. Family dining with live music on weekends.",
+          experience: 15,
+          address: "Rajouri Garden, Delhi",
+          latitude: "28.6410",
+          longitude: "77.1200",
+          rating: "4.7",
+          reviewCount: 432,
+          serviceArea: 8,
           isVerified: true,
           isAvailable: true,
-          specializations: ["Indian", "North Indian", "Tandoor"],
+          specializations: ["North Indian", "Punjabi", "Tandoor", "Dal Makhani"],
         },
         {
-          userId: sampleUsers[0].id,
-          categoryId: restaurantCategory.id,
-          businessName: "The Italian Hub",
-          description: "Authentic Italian pasta and pizzas",
-          address: "HSR Layout, Bangalore",
-          latitude: "12.9121",
-          longitude: "77.6446",
-          rating: "4.6",
-          reviewCount: 178,
+          userId: sampleUsers[12].id,
+          categoryId: restaurantCat.id,
+          businessName: "Chinese Wok Express",
+          description: "Best Chinese and Thai food. Cozy ambiance with quick service.",
+          experience: 8,
+          address: "Greater Kailash, Delhi",
+          latitude: "28.5494",
+          longitude: "77.2428",
+          rating: "4.5",
+          reviewCount: 289,
+          serviceArea: 6,
           isVerified: true,
           isAvailable: true,
-          specializations: ["Italian", "Pizza", "Pasta"],
+          specializations: ["Chinese", "Thai", "Asian Fusion", "Noodles"],
         },
       ]).onConflictDoNothing().returning();
-
+      providers.push(...restaurants);
       console.log(`✅ Created ${restaurants.length} restaurants`);
 
       // Add restaurant menu items
       if (restaurants.length > 0) {
         const restaurantMenu = await db.insert(restaurantMenuItems).values([
-          // Spice Garden items
+          // Punjabi Dhaba items
           {
             providerId: restaurants[0].id,
             name: "Butter Chicken",
@@ -206,6 +403,16 @@ async function seed() {
             category: "Main Course",
             price: "380",
             isVeg: false,
+            isAvailable: true,
+            cuisine: "Indian",
+          },
+          {
+            providerId: restaurants[0].id,
+            name: "Dal Makhani",
+            description: "Black lentils slow-cooked with butter and cream",
+            category: "Main Course",
+            price: "280",
+            isVeg: true,
             isAvailable: true,
             cuisine: "Indian",
           },
@@ -219,46 +426,36 @@ async function seed() {
             isAvailable: true,
             cuisine: "Indian",
           },
-          {
-            providerId: restaurants[0].id,
-            name: "Gulab Jamun",
-            description: "Classic Indian sweet dumplings in sugar syrup",
-            category: "Desserts",
-            price: "120",
-            isVeg: true,
-            isAvailable: true,
-            cuisine: "Indian",
-          },
-          // The Italian Hub items
+          // Chinese Wok items
           {
             providerId: restaurants[1].id,
-            name: "Margherita Pizza",
-            description: "Classic pizza with tomato sauce, mozzarella, and basil",
+            name: "Hakka Noodles",
+            description: "Stir-fried noodles with vegetables and sauces",
             category: "Main Course",
-            price: "450",
+            price: "220",
             isVeg: true,
             isAvailable: true,
-            cuisine: "Italian",
+            cuisine: "Chinese",
           },
           {
             providerId: restaurants[1].id,
-            name: "Alfredo Pasta",
-            description: "Creamy fettuccine pasta with parmesan",
+            name: "Chicken Manchurian",
+            description: "Crispy chicken in spicy Manchurian sauce",
             category: "Main Course",
-            price: "380",
-            isVeg: true,
+            price: "340",
+            isVeg: false,
             isAvailable: true,
-            cuisine: "Italian",
+            cuisine: "Chinese",
           },
           {
             providerId: restaurants[1].id,
-            name: "Tiramisu",
-            description: "Classic Italian dessert with coffee and mascarpone",
-            category: "Desserts",
-            price: "180",
+            name: "Thai Green Curry",
+            description: "Aromatic green curry with vegetables and coconut milk",
+            category: "Main Course",
+            price: "360",
             isVeg: true,
             isAvailable: true,
-            cuisine: "Italian",
+            cuisine: "Thai",
           },
         ]).onConflictDoNothing().returning();
 
@@ -266,7 +463,7 @@ async function seed() {
       }
     }
 
-    // Add some grocery products
+    // Add grocery products
     const groceryItems = await db.insert(groceryProducts).values([
       {
         name: "Fresh Bananas",
@@ -274,8 +471,19 @@ async function seed() {
         category: "Fruits",
         price: "40",
         weight: "1 dozen",
+        unit: "dozen",
         inStock: true,
         stockQuantity: 50,
+      },
+      {
+        name: "Fresh Apples",
+        description: "Crisp and juicy red apples",
+        category: "Fruits",
+        price: "120",
+        weight: "1 kg",
+        unit: "kg",
+        inStock: true,
+        stockQuantity: 30,
       },
       {
         name: "Whole Wheat Bread",
@@ -283,6 +491,7 @@ async function seed() {
         category: "Bakery",
         price: "45",
         weight: "400g",
+        unit: "pack",
         inStock: true,
         stockQuantity: 30,
       },
@@ -292,14 +501,36 @@ async function seed() {
         category: "Dairy",
         price: "56",
         weight: "1L",
+        unit: "liter",
         inStock: true,
         stockQuantity: 100,
+      },
+      {
+        name: "Basmati Rice",
+        description: "Premium long grain basmati rice",
+        category: "Staples",
+        price: "180",
+        weight: "1 kg",
+        unit: "kg",
+        inStock: true,
+        stockQuantity: 40,
+      },
+      {
+        name: "Fresh Tomatoes",
+        description: "Farm fresh red tomatoes",
+        category: "Vegetables",
+        price: "35",
+        weight: "500g",
+        unit: "pack",
+        inStock: true,
+        stockQuantity: 60,
       },
     ]).onConflictDoNothing().returning();
 
     console.log(`✅ Created ${groceryItems.length} grocery items`);
 
     console.log("✨ Database seeding completed successfully!");
+    console.log(`📊 Total providers created: ${providers.length}`);
   } catch (error) {
     console.error("❌ Error seeding database:", error);
     throw error;

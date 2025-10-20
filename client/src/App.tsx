@@ -10,7 +10,6 @@ import Electrician from "@/pages/electrician";
 import ElectricianDetail from "@/pages/electrician-detail";
 import Plumber from "@/pages/plumber";
 import Beauty from "@/pages/beauty";
-// 💥 FIX: Import path ko capital letters ke saath theek kiya (assuming convention is @/pages/BeautyDetail) 💥
 import BeautyDetail from "@/pages/BeautyDetail"; // <-- Assuming this component name is correct
 import CakeShop from "@/pages/cake-shop";
 import Grocery from "@/pages/grocery";

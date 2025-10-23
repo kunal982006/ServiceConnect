@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/hooks/use-cart";
+// --- BADLAV: useCart ki jagah useCartStore import kiya ---
+import { useCartStore } from "@/hooks/use-cart-store";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ShoppingCart, Truck, CreditCard } from "lucide-react";
+// --- NAYE ICONS IMPORT KIYE HAIN ---
+import { ArrowLeft, ShoppingCart, Truck, CreditCard, Minus, Plus, Trash2 } from "lucide-react";
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_dummy');
@@ -18,7 +20,8 @@ const CheckoutForm = () => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
-  const { items, clearCart } = useCart();
+  // --- BADLAV: useCart ki jagah useCartStore se items aur clearCart liya ---
+  const { items, clearCart } = useCartStore();
   const [, setLocation] = useLocation();
   const [processing, setProcessing] = useState(false);
 
@@ -46,10 +49,10 @@ const CheckoutForm = () => {
       });
     } else {
       toast({
-        title: "Payment Successful", 
+        title: "Payment Successful",
         description: "Thank you for your order! Your groceries will be delivered soon.",
       });
-      clearCart();
+      clearCart(); // Cart ko clear kiya payment ke baad
       setLocation('/');
     }
 
@@ -70,8 +73,8 @@ const CheckoutForm = () => {
         </CardContent>
       </Card>
 
-      <Button 
-        type="submit" 
+      <Button
+        type="submit"
         className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground"
         disabled={!stripe || !elements || processing || items.length === 0}
         data-testid="button-place-order"
@@ -84,18 +87,20 @@ const CheckoutForm = () => {
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
-  const { items } = useCart();
+  // --- BADLAV: useCart ki jagah useCartStore se items, removeItem, increaseQuantity, decreaseQuantity liya ---
+  const { items, removeItem, increaseQuantity, decreaseQuantity, getTotalPrice } = useCartStore();
   const [clientSecret, setClientSecret] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const subtotal = items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  // --- BADLAV: subtotal calculation ab getTotalPrice() function se aayega ---
+  const subtotal = getTotalPrice();
   const platformFee = subtotal * 0.01; // 1% platform fee
   const deliveryFee = 24.50; // Mock delivery fee
   const total = subtotal + platformFee + deliveryFee;
 
   useEffect(() => {
     if (items.length === 0) {
-      setLocation('/grocery');
+      setLocation('/street-food'); // Cart empty hone par street-food page par redirect
       return;
     }
 
@@ -103,13 +108,15 @@ export default function Checkout() {
     const createPaymentIntent = async () => {
       try {
         const response = await apiRequest("POST", "/api/create-payment-intent", {
-          amount: total,
+          amount: Math.round(total * 100), // Stripe expects amount in cents/paise
           currency: 'inr'
         });
         const data = await response.json();
         setClientSecret(data.clientSecret);
       } catch (error) {
         console.error('Error creating payment intent:', error);
+        // Optionally show a toast error
+        // toast({ title: "Error", description: "Could not initialize payment.", variant: "destructive" });
       } finally {
         setLoading(false);
       }
@@ -137,11 +144,11 @@ export default function Checkout() {
         <Button
           variant="ghost"
           className="mb-6 flex items-center space-x-2"
-          onClick={() => setLocation("/grocery")}
+          onClick={() => setLocation("/street-food")} // --- BADLAV: Back to /street-food ---
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Cart</span>
+          <span>Back to Street Food</span>
         </Button>
 
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
@@ -153,7 +160,7 @@ export default function Checkout() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <ShoppingCart className="h-5 w-5" />
-                  <span>Order Summary</span>
+                  <span>Your Cart Items</span> {/* --- BADLAV: Title changed to be more specific --- */}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -163,20 +170,51 @@ export default function Checkout() {
                     <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center space-x-3">
                         {item.imageUrl && (
-                          <img 
-                            src={item.imageUrl} 
+                          <img
+                            src={item.imageUrl}
                             alt={item.name}
                             className="w-10 h-10 rounded object-cover"
                           />
                         )}
                         <div>
                           <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">{item.weight}</p>
+                          {/* item.weight removed as it's not in our cart item structure */}
+                          {/* <p className="text-sm text-muted-foreground">{item.weight}</p> */}
+                          <p className="text-sm text-muted-foreground">₹{item.price.toFixed(2)} / item</p> {/* Individual item price */}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <Badge variant="secondary">×{item.quantity}</Badge>
-                        <p className="font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
+                      <div className="text-right flex items-center space-x-2"> {/* --- BADLAV: Quantity controls added --- */}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => decreaseQuantity(item.id)}
+                          disabled={item.quantity <= 1} // 1 se kam nahi hoga
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Badge variant="secondary" className="h-7 w-7 flex items-center justify-center">
+                            {item.quantity}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => increaseQuantity(item.id)}
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(item.id)}
+                          aria-label="Remove item"
+                          className="ml-2 text-destructive"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </Button>
                       </div>
                     </div>
                   ))}

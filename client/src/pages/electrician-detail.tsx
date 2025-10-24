@@ -254,8 +254,13 @@ function ApplianceProblems({
     queryKey: [
       "/api/service-problems",
       electricianCategoryId,
-      { parentId: appliance.id },
+      appliance.id,
     ],
+    queryFn: async () => {
+      const res = await fetch(`/api/service-problems/${electricianCategoryId}?parentId=${appliance.id}`);
+      if (!res.ok) throw new Error("Failed to fetch problems");
+      return res.json();
+    },
     enabled: !!electricianCategoryId && !!appliance.id,
   });
 

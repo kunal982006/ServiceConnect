@@ -1,9 +1,12 @@
+// server/src/shared/schema.ts
+
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, decimal, boolean, timestamp, serial, jsonb } from "drizzle-orm/pg-core";
-import { createId } from "@paralleldrive/cuid2"; // <-- YEH WALI LINE ADD KARO
+import { createId } from "@paralleldrive/cuid2";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
 
 // Users table
 export const users = pgTable("users", {
@@ -55,19 +58,21 @@ export const serviceProblems = pgTable("service_problems", {
   parentId: varchar("parent_id"),
 });
 
-// Add self-referencing foreign key after table definition
-// This avoids the circular reference issue during initialization
-
-// Beauty services
+// Beauty services (UPDATED)
 export const beautyServices = pgTable("beauty_services", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  imageUrl: text("image_url"),
-  duration: integer("duration_minutes"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  category: text("category"), // Hair, Facial, Makeup, Spa, Bridal
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // Consistent with other varchar IDs
+  providerId: varchar("provider_id") // providerId type matches serviceProviders.id
+    .notNull()
+    .references(() => serviceProviders.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // Service ka naam (e.g., "Haircut", "Facial")
+  description: text("description"), // Service ki description
+  imageUrl: text("image_url"), // Service ki image
+  duration: integer("duration_minutes"), // Service kitni der ki hai (in minutes)
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(), // Service ki price
+  category: text("category"), // Category (e.g., "Hair", "Skin", "Nails")
+  subCategory: text("sub_category"), // Naya field: subCategory
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(), // Naya field: updatedAt
 });
 
 // Cake products
@@ -84,10 +89,6 @@ export const cakeProducts = pgTable("cake_products", {
 });
 
 // Grocery products
-// shared/schema.ts (partial code)
-
-// ... existing imports and other schemas ...
-
 export const groceryProducts = pgTable("grocery_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 256 }).notNull(),
@@ -98,12 +99,10 @@ export const groceryProducts = pgTable("grocery_products", {
   unit: varchar("unit", { length: 50 }), // e.g., "kg", "dozen", "pack"
   inStock: boolean("in_stock").default(true).notNull(),
   stockQuantity: integer("stock_quantity").default(0).notNull(),
-  imageUrl: varchar("image_url", { length: 256 }), // --- NAYA FIELD ADD KIYA ---
+  imageUrl: varchar("image_url", { length: 256 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-// ... rest of the schema file ...
 
 // Rental properties
 export const rentalProperties = pgTable("rental_properties", {
@@ -161,11 +160,11 @@ export const groceryOrders = pgTable("grocery_orders", {
 
 // Street food menu items
 export const streetFoodItems = pgTable("street_food_items", {
-  id: text("id").primaryKey().$defaultFn(() => createId()),
+  id: text("id").primaryKey().$defaultFn(() => createId()), // Using cuid2
   providerId: text("provider_id").notNull().references(() => serviceProviders.id),
   name: text("name").notNull(),
   description: text("description"),
-  imageUrl: text("image_url"), // <-- YEH NAYI LINE ADD KARO
+  imageUrl: text("image_url"),
   category: text("category"),
   price: text("price").notNull(),
   isVeg: boolean("is_veg").default(true),
@@ -232,7 +231,7 @@ export const serviceProvidersRelations = relations(serviceProviders, ({ one, man
   }),
   bookings: many(bookings),
   reviews: many(reviews),
-  beautyServices: many(beautyServices),
+  beautyServices: many(beautyServices), // Relation for beautyServices
   cakeProducts: many(cakeProducts),
   streetFoodItems: many(streetFoodItems),
   restaurantMenuItems: many(restaurantMenuItems),
@@ -316,6 +315,17 @@ export const insertTableBookingSchema = createInsertSchema(tableBookings).pick({
   specialRequests: true,
 });
 
+// New Insert Schema for BeautyService
+export const insertBeautyServiceSchema = createInsertSchema(beautyServices).pick({
+  name: true,
+  description: true,
+  imageUrl: true,
+  duration: true,
+  price: true,
+  category: true,
+  subCategory: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -330,6 +340,7 @@ export type InsertRentalProperty = z.infer<typeof insertRentalPropertySchema>;
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type ServiceProblem = typeof serviceProblems.$inferSelect;
 export type BeautyService = typeof beautyServices.$inferSelect;
+export type InsertBeautyService = z.infer<typeof insertBeautyServiceSchema>; // New Insert Type
 export type CakeProduct = typeof cakeProducts.$inferSelect;
 export type GroceryProduct = typeof groceryProducts.$inferSelect;
 export type StreetFoodItem = typeof streetFoodItems.$inferSelect;

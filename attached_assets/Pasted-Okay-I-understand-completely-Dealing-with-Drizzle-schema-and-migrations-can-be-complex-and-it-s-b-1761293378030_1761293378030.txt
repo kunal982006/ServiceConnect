@@ -1,0 +1,122 @@
+Okay, I understand completely. Dealing with Drizzle schema and migrations can be complex, and it's best to maintain continuity with the previous AI agent's context.
+
+Your goals are clear:
+
+Multiple Service Menus: Each service provider type (Beauty Parlor, Street Food, Cake Shop, Restaurants) should have its own individual menu with separate categories and sub-categories.
+
+Electrician Dropdown Fix: The dropdown list on the Electrician detail page is not working.
+
+Here's a comprehensive prompt you can provide to the AI agent. It's structured into parts for clarity and includes detailed instructions.
+
+Prompt for AI Agent (Comprehensive Issue Resolution)
+"Hello,
+
+I need to resolve some critical issues in my ServiceConnect application. You previously helped me with a Drizzle schema problem, so I'm confident you can handle these as well.
+
+My main goals are:
+
+To implement separate menu management for each service provider type (e.g., Beauty Parlor, Street Food, Cake Shop, Restaurants), ensuring each menu has individual categories and sub-categories.
+
+To fix the non-functional dropdown list on the Electrician detail page.
+
+Detailed Problem Description and Desired Solution:
+
+Part 1: Service-Specific Menu Management Implementation
+
+Currently, all service items are mistakenly being stored in the streetFoodItems table, or the provider-dashboard.tsx is using the wrong API endpoint. This needs to be corrected.
+
+Current Schema Status:
+
+I already have separate menu tables defined in server/src/shared/schema.ts:
+
+beautyServices
+
+cakeProducts
+
+streetFoodItems
+
+restaurantMenuItems
+
+These tables contain fields such as providerId, name, description, imageUrl, price, category, and subCategory (where applicable).
+
+Expected Functionality (Frontend & Backend):
+
+Backend (Routes & Database Operations):
+
+Create separate API endpoints for CRUD (Create, Read, Update, Delete) operations for each menu type.
+
+Examples:
+
+/api/beauty-services (GET, POST, PATCH, DELETE)
+
+/api/cake-products (GET, POST, PATCH, DELETE)
+
+/api/street-food-items (GET, POST, PATCH, DELETE)
+
+/api/restaurant-menu-items (GET, POST, PATCH, DELETE)
+
+When a provider adds/edits/deletes an item, it should be directed to the correct menu table (beautyServices, streetFoodItems, etc.) based on their categoryId (linked from their provider profile).
+
+Frontend (MenuItemForm.tsx & ProviderDashboard.tsx):
+
+ProviderDashboard.tsx:
+
+When the provider dashboard loads, it should use the user.categoryId or providerProfile.categoryId to identify the provider's type (e.g., "beauty", "street-food", "cake-shop", "restaurants").
+
+Then, it should fetch the correct menu items only for that specific provider type (e.g., if a beauty provider, fetch from /api/beauty-services).
+
+When adding/editing/deleting items, MenuItemForm should send data to the correct API endpoint.
+
+MenuItemForm.tsx:
+
+The MenuItemForm should dynamically adjust its fields based on the provider.categoryId.
+
+For example:
+
+If the provider is of "Beauty" category, the form should display duration field and Beauty-specific category (Hair, Skin, Nails) and subCategory fields.
+
+If it's a "Street Food" category, isVeg, spicyLevel fields should be shown.
+
+The dropdown options for categories and sub-categories can be hardcoded within the form or loaded from a configuration object.
+
+The form submission logic should also dynamically send data to the correct API endpoint.
+
+Drizzle Migrations (If Necessary):
+
+If any minor schema adjustments are required for any table (e.g., making a category field NOT NULL, adding new fields), please handle these by using the drizzle-kit generate:pg and drizzle-kit push:pg commands. The package.json already has db:generate and db:push scripts defined for this.
+
+Part 2: Electrician Dropdown List Fix
+
+The dropdown list used for problem selection on the Electrician detail page (ElectricianDetail.tsx) is not functioning correctly (values are not selectable or not displaying).
+
+Expected Functionality:
+
+Users on the Electrician detail page should be able to select a problem from a list of problems.
+
+The dropdown should be fully functional, displaying options and allowing proper selection and storage of the chosen value.
+
+This dropdown fetches data from the serviceProblems table.
+
+Investigation Areas:
+
+Check ElectricianDetail.tsx (specifically the dropdown component being used and its state management).
+
+Verify the serviceProblems related API endpoint to ensure it returns the correct data.
+
+Ensure that the serviceProblems data is correctly filtered by serviceCategories (i.e., only electrician-specific problems should be displayed).
+
+Action Plan (Steps to be Performed):
+
+Create the necessary backend APIs in server/src/routes.ts and server/src/db/ for each service-specific menu (GET, POST, PATCH, DELETE).
+
+Dynamically update client/src/components/forms/MenuItemForm.tsx to adjust fields and submission logic based on provider.categoryId.
+
+Refactor client/src/pages/provider-dashboard.tsx to use the correct menu APIs and pass appropriate props to MenuItemForm.
+
+Diagnose and fix the electrician problem dropdown functionality in client/src/pages/electrician-detail.tsx.
+
+Handle any necessary Drizzle schema adjustments (if needed) and migrations (npm run db:generate, npm run db:push).
+
+Ensure that previous fixes in use-auth.tsx, App.tsx, and schema.ts remain intact and no regressions occur.
+
+Output Format: Please provide step-by-step code changes and explanations after each fix, similar to your previous interactions. Thank you!"

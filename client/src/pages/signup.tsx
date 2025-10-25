@@ -1,8 +1,9 @@
-import { useState } from "react";
+// client/src/pages/signup.tsx (THE COMPLETE & FINAL CODE)
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query"; // useQueryClient import karo
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -40,6 +40,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 export default function Signup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // queryClient ko initialize karo
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -54,18 +55,27 @@ export default function Signup() {
   });
 
   const signupMutation = useMutation({
-    mutationFn: async (data: SignupFormValues) => {
+    mutationFn: (data: SignupFormValues) => {
       const { confirmPassword, ...signupData } = data;
-      const response = await apiRequest("POST", "/api/auth/signup", signupData);
-      return response.json();
+      return apiRequest("POST", "/api/auth/signup", signupData);
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (response) => { // Isko 'async' banao
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Signup failed");
+      }
+      const data = await response.json();
+
       toast({
         title: "Account Created!",
         description: `Welcome to ServiceHub, ${data.user.username}!`,
       });
-      
-      // Redirect based on user role
+
+      // App ko force kar rahe hain ki pehle user ki details refresh kare.
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
+
+      // Ab jab app ko pata hai ki user logged in hai, tab redirect karo.
       if (data.user.role === "provider") {
         setLocation("/provider-onboarding");
       } else {
@@ -75,7 +85,7 @@ export default function Signup() {
     onError: (error: any) => {
       toast({
         title: "Signup Failed",
-        description: error.message || "Could not create account",
+        description: error.message || "Could not create account.",
         variant: "destructive",
       });
     },

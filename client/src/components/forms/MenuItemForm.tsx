@@ -1,4 +1,4 @@
-// client/src/components/forms/MenuItemForm.tsx
+// client/src/components/forms/MenuItemForm.tsx (THE FULL AND FINAL CODE)
 
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -8,9 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast"; // Correct path
-import api from "@/lib/api"; // Correct path
+import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 import {
   Form,
   FormControl,
@@ -21,131 +20,58 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// Removed: import { Checkbox } from "@/components/ui/checkbox"; // Not used, so removed
+import { Loader2 } from "lucide-react";
 
-// --- Define Category-Specific Schemas and Options ---
-const beautyCategories = [
-  { value: "Hair", label: "Hair Services" },
-  { value: "Skin", label: "Skin Care" },
-  { value: "Nails", label: "Nail Care" },
-  { value: "Makeup", label: "Makeup" },
-  { value: "Spa", label: "Spa & Massage" },
-  { value: "Bridal", label: "Bridal Services" },
-];
+// --- Schemas and Options ---
+const beautyCategories = [ { value: "Hair", label: "Hair Services" }, { value: "Skin", label: "Skin Care" }, { value: "Nails", label: "Nail Care" }, { value: "Makeup", label: "Makeup" }, { value: "Spa", label: "Spa & Massage" }, { value: "Bridal", label: "Bridal Services" }, ];
+const beautySubCategories = { Hair: [{ value: "Haircut_Men", label: "Haircut (Men)" }, { value: "Haircut_Women", label: "Haircut (Women)" }, { value: "Hair_Spa", label: "Hair Spa" }, { value: "Hair_Color", label: "Hair Color" }], Skin: [{ value: "Facial_Gold", label: "Facial (Gold)" }, { value: "Facial_Fruit", label: "Facial (Fruit)" }, { value: "Cleanup", label: "Cleanup" }, { value: "Bleach", label: "Bleach" }], Nails: [{ value: "Manicure", label: "Manicure" }, { value: "Pedicure", label: "Pedicure" }], };
+const foodCategories = [ { value: "Snacks", label: "Snacks" }, { value: "Main_Course", label: "Main Course" }, { value: "Beverages", label: "Beverages" }, { value: "Desserts", label: "Desserts" }, ];
+const spicyLevels = [ { value: "Mild", label: "Mild" }, { value: "Medium", label: "Medium" }, { value: "Hot", label: "Hot" }, { value: "Extra_Hot", label: "Extra Hot" }, ];
+const cakeCategories = [ { value: "Birthday", label: "Birthday Cakes" }, { value: "Anniversary", label: "Anniversary Cakes" }, { value: "Wedding", label: "Wedding Cakes" }, { value: "Custom", label: "Custom Cakes" }, { value: "Cupcakes", label: "Cupcakes & Pastries" }, ];
+const restaurantCategories = [ { value: "Starters", label: "Starters" }, { value: "Main_Course", label: "Main Course" }, { value: "Desserts", label: "Desserts" }, { value: "Beverages", label: "Beverages" }, { value: "Soups", label: "Soups" }, ];
 
-const beautySubCategories = {
-  Hair: [{ value: "Haircut_Men", label: "Haircut (Men)" }, { value: "Haircut_Women", label: "Haircut (Women)" }, { value: "Hair_Spa", label: "Hair Spa" }, { value: "Hair_Color", label: "Hair Color" }],
-  Skin: [{ value: "Facial_Gold", label: "Facial (Gold)" }, { value: "Facial_Fruit", label: "Facial (Fruit)" }, { value: "Cleanup", label: "Cleanup" }, { value: "Bleach", label: "Bleach" }],
-  Nails: [{ value: "Manicure", label: "Manicure" }, { value: "Pedicure", label: "Pedicure" }],
-  // Add more as needed, ensure these match your schema and UI
-};
+const baseSchema = z.object({ name: z.string().min(2, { message: "Name must be at least 2 characters." }), description: z.string().optional(), imageUrl: z.string().url({ message: "Invalid URL" }).optional().or(z.literal("")), price: z.string().regex(/^\d+(\.\d{1,2})?$/, { message: "Invalid price format" }), });
+const beautySchema = baseSchema.extend({ duration: z.string().regex(/^\d+$/, { message: "Duration must be a number in minutes." }).optional().or(z.literal("")), category: z.enum(beautyCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }), subCategory: z.string().optional(), });
+const foodSchema = baseSchema.extend({ isVeg: z.boolean().default(true).optional(), spicyLevel: z.enum(spicyLevels.map(s => s.value) as [string, ...string[]]).optional(), category: z.enum(foodCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }), });
+const cakeSchema = baseSchema.extend({ category: z.enum(cakeCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }), });
+const restaurantSchema = baseSchema.extend({ isVeg: z.boolean().default(true).optional(), category: z.enum(restaurantCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }), cuisine: z.string().optional(), });
 
-const foodCategories = [
-  { value: "Snacks", label: "Snacks" },
-  { value: "Main_Course", label: "Main Course" },
-  { value: "Beverages", label: "Beverages" },
-  { value: "Desserts", label: "Desserts" },
-];
-const spicyLevels = [
-  { value: "Mild", label: "Mild" },
-  { value: "Medium", label: "Medium" },
-  { value: "Hot", label: "Hot" },
-  { value: "Extra_Hot", label: "Extra Hot" },
-];
-
-const cakeCategories = [
-  { value: "Birthday", label: "Birthday Cakes" },
-  { value: "Anniversary", label: "Anniversary Cakes" },
-  { value: "Wedding", label: "Wedding Cakes" },
-  { value: "Custom", label: "Custom Cakes" },
-  { value: "Cupcakes", label: "Cupcakes & Pastries" },
-];
-
-const restaurantCategories = [
-  { value: "Starters", label: "Starters" },
-  { value: "Main_Course", label: "Main Course" },
-  { value: "Desserts", label: "Desserts" },
-  { value: "Beverages", label: "Beverages" },
-  { value: "Soups", label: "Soups" },
-];
-
-
-// Base Schema (common fields)
-const baseSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  description: z.string().optional(),
-  imageUrl: z.string().url({ message: "Invalid URL" }).optional().or(z.literal("")),
-  price: z.string().regex(/^\d+(\.\d{1,2})?$/, { message: "Invalid price format" }), // Price as string for flexibility
-});
-
-// Category-specific schemas
-const beautySchema = baseSchema.extend({
-  duration: z.string().regex(/^\d+$/, { message: "Duration must be a number in minutes." }).optional().or(z.literal("")),
-  category: z.enum(beautyCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }),
-  subCategory: z.string().optional(), // Will be dynamically validated based on selected category
-});
-
-const foodSchema = baseSchema.extend({
-  isVeg: z.boolean().default(true).optional(),
-  spicyLevel: z.enum(spicyLevels.map(s => s.value) as [string, ...string[]]).optional(),
-  category: z.enum(foodCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }),
-});
-
-const cakeSchema = baseSchema.extend({
-  category: z.enum(cakeCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }),
-});
-
-const restaurantSchema = baseSchema.extend({
-  isVeg: z.boolean().default(true).optional(),
-  category: z.enum(restaurantCategories.map(c => c.value) as [string, ...string[]], { message: "Please select a category." }),
-  cuisine: z.string().optional(), // e.g., Indian, Chinese, Italian
-});
-
-
-// Combined type for form values (for defaultValues and onSubmit)
 type FormValues = z.infer<typeof beautySchema> | z.infer<typeof foodSchema> | z.infer<typeof cakeSchema> | z.infer<typeof restaurantSchema>;
-
-type MenuItemFormProps = {
-  providerId: string;
-  categorySlug: string;
-  initialData?: any; // Consider typing this more strictly if possible
-  onSuccess: () => void;
-};
+type MenuItemFormProps = { providerId: string; categorySlug: string; initialData?: any; onSuccess: () => void; };
 
 const MenuItemForm: React.FC<MenuItemFormProps> = ({ providerId, categorySlug, initialData, onSuccess }) => {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSubCategories, setCurrentSubCategories] = useState<{value: string; label: string;}[]>([]);
 
-  // Dynamically select schema based on categorySlug
   const getSchema = () => {
     switch (categorySlug) {
       case "beauty": return beautySchema;
       case "street-food": return foodSchema;
       case "cake-shop": return cakeSchema;
       case "restaurants": return restaurantSchema;
-      default: return baseSchema; // Fallback, though a specific category should always be present
+      default: return baseSchema;
     }
   };
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(getSchema()), // Resolver will re-evaluate when getSchema's dependencies change
-    defaultValues: {
-      name: initialData?.name || "",
-      description: initialData?.description || "",
-      imageUrl: initialData?.imageUrl || "",
-      price: initialData?.price?.toString() || "",
-      duration: initialData?.duration_minutes?.toString() || "",
-      category: initialData?.category || "",
-      subCategory: initialData?.subCategory || "",
-      isVeg: initialData?.isVeg ?? true,
-      spicyLevel: initialData?.spicyLevel || "",
-      cuisine: initialData?.cuisine || "",
-    },
+    resolver: zodResolver(getSchema()),
+    defaultValues: initialData ? {
+        name: initialData.name,
+        description: initialData.description,
+        imageUrl: initialData.imageUrl,
+        price: initialData.price?.toString(),
+        duration: initialData.duration_minutes?.toString(),
+        category: initialData.category,
+        subCategory: initialData.subCategory,
+        isVeg: initialData.isVeg ?? true,
+        spicyLevel: initialData.spicyLevel,
+        cuisine: initialData.cuisine,
+    } : { isVeg: true },
   });
 
   useEffect(() => {
-    if (initialData) {
-      form.reset({
+    form.reset(initialData ? {
         name: initialData.name || "",
         description: initialData.description || "",
         imageUrl: initialData.imageUrl || "",
@@ -156,194 +82,239 @@ const MenuItemForm: React.FC<MenuItemFormProps> = ({ providerId, categorySlug, i
         isVeg: initialData.isVeg ?? true,
         spicyLevel: initialData.spicyLevel || "",
         cuisine: initialData.cuisine || "",
-      });
-      if (categorySlug === "beauty" && initialData.category) {
+    } : { isVeg: true });
+    if (categorySlug === "beauty" && initialData?.category) {
         setCurrentSubCategories(beautySubCategories[initialData.category as keyof typeof beautySubCategories] || []);
-      }
-    } else {
-      form.reset({
-        name: "", description: "", imageUrl: "", price: "",
-        duration: "", category: "", subCategory: "", isVeg: true, spicyLevel: "", cuisine: ""
-      } as FormValues);
-      setCurrentSubCategories([]);
     }
-    // No need to setResolver here directly, as it's handled by `useForm` when `getSchema()`'s deps change.
-  }, [initialData, categorySlug, form]); // `getSchema` itself is not a dependency of useEffect, but `categorySlug` is.
+  }, [initialData, categorySlug, form]);
 
   const selectedCategory = form.watch("category");
   useEffect(() => {
     if (categorySlug === "beauty" && selectedCategory) {
       setCurrentSubCategories(beautySubCategories[selectedCategory as keyof typeof beautySubCategories] || []);
+      form.setValue("subCategory", "");
     } else {
       setCurrentSubCategories([]);
-    }
-    // Clear subCategory when main category changes (unless it's already the selected one)
-    if (form.getValues("category") !== selectedCategory) {
-        form.setValue("subCategory", "");
     }
   }, [selectedCategory, categorySlug, form]);
 
   const onSubmit = async (values: FormValues) => {
+    setIsSubmitting(true);
     try {
-      const payload: any = {
-        providerId,
-        name: values.name,
-        description: values.description || null,
-        imageUrl: values.imageUrl || null,
-        price: parseFloat(values.price),
-        category: values.category || null,
-      };
+      const payload: any = { providerId, name: values.name, description: values.description || null, imageUrl: values.imageUrl || null, price: parseFloat(values.price), category: values.category || null, };
+      if (categorySlug === "beauty") { const beautyValues = values as z.infer<typeof beautySchema>; payload.duration_minutes = beautyValues.duration ? parseInt(beautyValues.duration) : null; payload.subCategory = beautyValues.subCategory || null; } else if (categorySlug === "street-food" || categorySlug === "restaurants") { const foodOrRestaurantValues = values as z.infer<typeof foodSchema | typeof restaurantSchema>; payload.isVeg = foodOrRestaurantValues.isVeg; if (categorySlug === "street-food") { payload.spicyLevel = (foodOrRestaurantValues as z.infer<typeof foodSchema>).spicyLevel || null; } if (categorySlug === "restaurants") { payload.cuisine = (foodOrRestaurantValues as z.infer<typeof restaurantSchema>).cuisine || null; } }
 
-      if (categorySlug === "beauty") {
-        const beautyValues = values as z.infer<typeof beautySchema>;
-        payload.duration_minutes = beautyValues.duration ? parseInt(beautyValues.duration) : null;
-        payload.subCategory = beautyValues.subCategory || null;
-      } else if (categorySlug === "street-food" || categorySlug === "restaurants") {
-        const foodOrRestaurantValues = values as z.infer<typeof foodSchema | typeof restaurantSchema>;
-        payload.isVeg = foodOrRestaurantValues.isVeg;
-        if (categorySlug === "street-food") {
-          payload.spicyLevel = (foodOrRestaurantValues as z.infer<typeof foodSchema>).spicyLevel || null;
-        }
-        if (categorySlug === "restaurants") {
-          payload.cuisine = (foodOrRestaurantValues as z.infer<typeof restaurantSchema>).cuisine || null;
-        }
-      }
-      // For cake-shop, add specific fields here if needed.
-
-      let res;
       if (initialData) {
-        res = await api.patch(`/api/menu-items/${initialData.id}`, { categorySlug, ...payload });
-        toast({ title: "Success", description: "Menu item updated successfully." });
+        await api.patch(`/api/menu-items/${initialData.id}`, payload);
+        toast({ title: "Success", description: "Menu item updated." });
       } else {
-        res = await api.post(`/api/menu-items`, { categorySlug, ...payload });
-        toast({ title: "Success", description: "Menu item added successfully." });
+        await api.post(`/api/menu-items`, payload);
+        toast({ title: "Success", description: "Menu item added." });
       }
       onSuccess();
     } catch (error: any) {
-      console.error("Error saving menu item:", error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to save menu item.",
+        description: error.response?.data?.message || "Failed to save.",
         variant: "destructive",
       });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input placeholder="Service or Item Name" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Describe the service/item" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Image URL</FormLabel>
-              <FormControl>
-                <Input placeholder="http://example.com/image.jpg" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Price (₹)</FormLabel>
-              <FormControl>
-                <Input type="text" placeholder="e.g., 500 or 500.00" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+    <div className="max-h-[70vh] overflow-y-auto pr-6 pl-2 -ml-2">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
-        {/* --- Category Specific Fields --- */}
-
-        {/* Beauty Specific Fields */}
-        {categorySlug === "beauty" && (
-          <>
+            {/* THIS IS THE FULL JSX THAT WAS MISSING BEFORE */}
             <FormField
               control={form.control}
-              name="duration"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Duration (minutes)</FormLabel>
+                  <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 60" {...field} />
+                    <Input placeholder="Service or Item Name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
-              name="category"
+              name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {beautyCategories.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Describe the service/item" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            {selectedCategory && currentSubCategories.length > 0 && (
+
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Price (₹)</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder="e.g., 500.00" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* --- Category Specific Fields --- */}
+
+            {categorySlug === "beauty" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration (minutes)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g., 60" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {beautyCategories.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {currentSubCategories.length > 0 && (
+                  <FormField
+                    control={form.control}
+                    name="subCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sub-Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a sub-category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {currentSubCategories.map((subCat) => (
+                              <SelectItem key={subCat.value} value={subCat.value}>
+                                {subCat.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </>
+            )}
+
+            {(categorySlug === "street-food" || categorySlug === "restaurants") && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(categorySlug === "street-food" ? foodCategories : restaurantCategories).map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="isVeg"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Vegetarian?</FormLabel>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
+            {categorySlug === "street-food" && (
               <FormField
                 control={form.control}
-                name="subCategory"
+                name="spicyLevel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sub-Category</FormLabel>
+                    <FormLabel>Spicy Level</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a sub-category" />
+                          <SelectValue placeholder="Select spicy level" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {currentSubCategories.map((subCat) => (
-                          <SelectItem key={subCat.value} value={subCat.value}>
-                            {subCat.label}
+                        {spicyLevels.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            {level.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -353,135 +324,57 @@ const MenuItemForm: React.FC<MenuItemFormProps> = ({ providerId, categorySlug, i
                 )}
               />
             )}
-          </>
-        )}
 
-        {/* Street Food & Restaurant Specific Fields */}
-        {(categorySlug === "street-food" || categorySlug === "restaurants") && (
-          <>
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+            {categorySlug === "restaurants" && (
+              <FormField
+                control={form.control}
+                name="cuisine"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cuisine</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
+                      <Input placeholder="e.g., Indian, Chinese" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {(categorySlug === "street-food" ? foodCategories : restaurantCategories).map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="isVeg"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <FormLabel>Vegetarian?</FormLabel>
-                    <FormDescription>Is this item vegetarian?</FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </>
-        )}
-
-        {/* Street Food Specific Spicy Level */}
-        {categorySlug === "street-food" && (
-          <FormField
-            control={form.control}
-            name="spicyLevel"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Spicy Level</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select spicy level" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {spicyLevels.map((level) => (
-                      <SelectItem key={level.value} value={level.value}>
-                        {level.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
-          />
-        )}
 
-        {/* Restaurant Specific Cuisine */}
-        {categorySlug === "restaurants" && (
-          <FormField
-            control={form.control}
-            name="cuisine"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cuisine</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g., Indian, Chinese" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+            {categorySlug === "cake-shop" && (
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a cake category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cakeCategories.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             )}
-          />
-        )}
 
-        {/* Cake Shop Specific Fields */}
-        {categorySlug === "cake-shop" && (
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a cake category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {cakeCategories.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        <Button type="submit">
-          {initialData ? "Update Item" : "Add Item"}
-        </Button>
-      </form>
-    </Form>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {initialData ? "Update Item" : "Add Item"}
+            </Button>
+          </form>
+        </Form>
+    </div>
   );
 };
 

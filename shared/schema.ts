@@ -90,7 +90,7 @@ export const cakeProducts = pgTable("cake_products", {
 
 // Grocery products
 export const groceryProducts = pgTable("grocery_products", {
-  id: serial("id").primaryKey(),
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 256 }).notNull(), // Category slug (e.g., "fruits")
@@ -160,7 +160,7 @@ export const groceryOrders = pgTable("grocery_orders", {
 
 // Street food menu items
 export const streetFoodItems = pgTable("street_food_items", {
-  id: text("id").primaryKey().$defaultFn(() => createId()), // Using cuid2
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   providerId: text("provider_id").notNull().references(() => serviceProviders.id),
   name: text("name").notNull(),
   description: text("description"),

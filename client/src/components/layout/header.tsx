@@ -29,12 +29,20 @@ export default function Header() {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    await logout();
-    toast({
-      title: "👋 Logged Out!",
-      description: "You have been successfully logged out.",
-    });
-    setLocation("/login");
+    try {
+      await logout(); // Ab yeh aaram se intezaar karega
+      toast({
+        title: "👋 Logged Out!",
+        description: "You have been successfully logged out.",
+      });
+      setLocation("/login"); // Logout poora hone ke baad, aaram se redirect hoga
+    } catch (error) {
+      toast({
+        title: "Logout Failed",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

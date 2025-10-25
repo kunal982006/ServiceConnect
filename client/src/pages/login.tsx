@@ -1,11 +1,11 @@
-// client/src/pages/login.tsx
+// client/src/pages/login.tsx (THE ULTIMATE FINAL FIX)
 
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api"; // Correct API path
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,56 +16,67 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Link, useLocation } from "wouter"; // Import useLocation from wouter
-import { useAuth } from "@/hooks/use-auth"; // Import useAuth to get user info after login
+import { Link, useLocation } from "wouter";
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  username: z.string().min(1, { message: "Username is required." }),
+  password: z.string().min(1, { message: "Password is required." }),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 const Login: React.FC = () => {
   const { toast } = useToast();
-  const [, setLocation] = useLocation(); // wouter's setLocation
-  const { login: authLogin } = useAuth(); // Get the login function from AuthContext
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      const res = await api.post("/api/auth/login", data);
+      const response = await apiRequest("POST", "/api/auth/login", data);
 
-      // Assuming res.data.user contains the logged-in user object from the backend
-      // and it matches the User interface in use-auth.ts
-      const loggedInUser = res.data.user;
+      if (!response.ok) {
+        const errorData = await response.json();
+        // Yeh line "Invalid Credentials" ka error toast me dikhayegi
+        throw new Error(errorData.message || "Login failed");
+      }
+
+      const responseData = await response.json();
+      const loggedInUser = responseData.user;
 
       if (loggedInUser) {
-        authLogin(loggedInUser); // Update AuthContext with user data
         toast({ title: "Success", description: "Logged in successfully!" });
 
-        // Redirect based on user role
+        // User ki details ko refresh karo
+        await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
+
+        // Aur phir redirect karo
         if (loggedInUser.role === 'provider') {
-          setLocation("/provider/dashboard"); // Redirect providers to their dashboard
+          setLocation("/provider/dashboard");
         } else {
-          setLocation("/"); // Redirect regular users to home
+          setLocation("/");
         }
       } else {
-         throw new Error("User data not returned after login.");
+        // Yeh case tabhi aayega jab server se 'user' object na mile
+        throw new Error("User data not found in login response.");
       }
 
     } catch (error: any) {
-      console.error("Login error:", error);
+      // Yeh catch block ab har tarah ke error ko pakdega aur jhootha login nahi hone dega
+      console.error("Login error caught:", error);
       toast({
         title: "Login Failed",
-        description: error.response?.data?.message || "Invalid credentials.",
+        description: error.message || "An unknown error occurred.",
         variant: "destructive",
       });
     }
@@ -79,12 +90,12 @@ const Login: React.FC = () => {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="email"
+              name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
+                    <Input placeholder="Enter your username" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -104,6 +115,7 @@ const Login: React.FC = () => {
               )}
             />
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
             </Button>
           </form>

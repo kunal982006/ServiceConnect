@@ -80,7 +80,7 @@ export default function ProviderOnboarding() {
         title: "Profile Created!",
         description: "Your service provider profile is now active.",
       });
-      setLocation("/provider-dashboard");
+      setLocation("/provider/dashboard");
     },
     onError: (error: any) => {
       toast({

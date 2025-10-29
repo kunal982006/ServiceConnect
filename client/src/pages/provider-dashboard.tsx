@@ -51,7 +51,7 @@ const ProviderDashboard: React.FC = () => {
   });
 
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any | null>(_ => null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
 
   const deleteMenuItemMutation = useMutation({
     mutationFn: (itemId: string) => api.delete(`/api/menu-items/${itemId}`),
@@ -101,8 +101,6 @@ const ProviderDashboard: React.FC = () => {
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Provider Dashboard</h1>
-
-        {/* 💥 FIX #1: Hum button ko disable kar denge agar category na ho 💥 */}
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setEditingItem(null)} disabled={!providerCategorySlug}>
@@ -116,8 +114,6 @@ const ProviderDashboard: React.FC = () => {
                 Fill in the details for your service or product below.
               </DialogDescription>
             </DialogHeader>
-
-            {/* 💥 FIX #2: Hum yahan bhi check karenge ki data ready hai ya nahi 💥 */}
             {providerCategorySlug && providerProfile ? (
               <MenuItemForm
                 providerId={providerProfile.id}
@@ -141,7 +137,9 @@ const ProviderDashboard: React.FC = () => {
         <div className="flex justify-center mt-10"><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Loading menu...</div>
       ) : (
         <>
-          {menuItems && menuItems.length > 0 ? (
+          {/* 💥 YEH HAI ASLI FIX 💥 */}
+          {/* Hum `Array.isArray()` se check kar rahe hain ki `menuItems` sach me ek array hai ya nahi. */}
+          {Array.isArray(menuItems) && menuItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {menuItems.map((item) => (
                 <div key={item.id} className="border p-4 rounded-lg shadow-sm bg-card">

@@ -483,12 +483,6 @@ async function seed() {
       }
     }
 
-    // Add grocery products
-    // server/seed.ts (partial code)
-    // ... existing imports ...
-    // ... existing users, serviceCategories, serviceProviders creation ...
-
-    // Add grocery products (YAHAN SE CODE REPLACE KARO)
     const groceryItems = await db.insert(groceryProducts).values([
       {
         name: "Fresh Bananas",
@@ -557,7 +551,6 @@ async function seed() {
         imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/89/Tomato_je.jpg', // Image URL add kiya
       },
       {
-        id: 'groc9',
         name: 'Detergent Soap',
         description: 'Lifebuoy Total 10 for germ protection',
         category: 'toiletries', // Nayi category slug
@@ -569,7 +562,6 @@ async function seed() {
         stockQuantity: 50,
       },
       {
-        id: 'groc10',
         name: 'Colgate Toothpaste',
         description: 'For strong teeth and fresh breath',
         category: 'toiletries',
@@ -581,7 +573,6 @@ async function seed() {
         stockQuantity: 40,
       },
       {
-        id: 'groc11',
         name: 'Dettol Handwash',
         description: 'Protects from 100 illness-causing germs',
         category: 'personal-care', // Nayi category slug
@@ -593,7 +584,6 @@ async function seed() {
         stockQuantity: 60,
       },
       {
-        id: 'groc12',
         name: 'Dove Shampoo',
         description: 'For smooth and shiny hair',
         category: 'personal-care',

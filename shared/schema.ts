@@ -10,7 +10,7 @@ import { z } from "zod";
 
 // Users table
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: text("id").$defaultFn(() => createId()).primaryKey(),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
@@ -23,7 +23,7 @@ export const users = pgTable("users", {
 
 // Service categories
 export const serviceCategories = pgTable("service_categories", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: text("id").$defaultFn(() => createId()).primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   icon: text("icon"),
@@ -32,7 +32,7 @@ export const serviceCategories = pgTable("service_categories", {
 
 // Service providers
 export const serviceProviders = pgTable("service_providers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   categoryId: varchar("category_id").references(() => serviceCategories.id).notNull(),
   businessName: text("business_name").notNull(),
@@ -52,7 +52,7 @@ export const serviceProviders = pgTable("service_providers", {
 
 // Service problems/categories (for electrician, plumber)
 export const serviceProblems = pgTable("service_problems", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   categoryId: varchar("category_id").references(() => serviceCategories.id).notNull(),
   name: text("name").notNull(),
   parentId: varchar("parent_id"),
@@ -60,7 +60,7 @@ export const serviceProblems = pgTable("service_problems", {
 
 // Beauty services (UPDATED)
 export const beautyServices = pgTable("beauty_services", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`), // Consistent with other varchar IDs
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   providerId: varchar("provider_id") // providerId type matches serviceProviders.id
     .notNull()
     .references(() => serviceProviders.id, { onDelete: "cascade" }),
@@ -77,7 +77,7 @@ export const beautyServices = pgTable("beauty_services", {
 
 // Cake products
 export const cakeProducts = pgTable("cake_products", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -90,7 +90,7 @@ export const cakeProducts = pgTable("cake_products", {
 
 // Grocery products
 export const groceryProducts = pgTable("grocery_products", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 256 }).notNull(), // Category slug (e.g., "fruits")
@@ -106,7 +106,7 @@ export const groceryProducts = pgTable("grocery_products", {
 
 // Rental properties
 export const rentalProperties = pgTable("rental_properties", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   ownerId: varchar("owner_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   description: text("description"),
@@ -128,7 +128,7 @@ export const rentalProperties = pgTable("rental_properties", {
 
 // Bookings/Service requests
 export const bookings = pgTable("bookings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   providerId: varchar("provider_id").references(() => serviceProviders.id),
   serviceType: text("service_type").notNull(),
@@ -145,7 +145,7 @@ export const bookings = pgTable("bookings", {
 
 // Grocery orders
 export const groceryOrders = pgTable("grocery_orders", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   items: jsonb("items").$type<Array<{ productId: string; quantity: number; price: number }>>(),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
@@ -160,7 +160,7 @@ export const groceryOrders = pgTable("grocery_orders", {
 
 // Street food menu items
 export const streetFoodItems = pgTable("street_food_items", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   providerId: text("provider_id").notNull().references(() => serviceProviders.id),
   name: text("name").notNull(),
   description: text("description"),
@@ -175,7 +175,7 @@ export const streetFoodItems = pgTable("street_food_items", {
 
 // Restaurant menu items
 export const restaurantMenuItems = pgTable("restaurant_menu_items", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -189,7 +189,7 @@ export const restaurantMenuItems = pgTable("restaurant_menu_items", {
 
 // Restaurant table bookings
 export const tableBookings = pgTable("table_bookings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
   date: timestamp("booking_date").notNull(),
@@ -202,7 +202,7 @@ export const tableBookings = pgTable("table_bookings", {
 
 // Reviews
 export const reviews = pgTable("reviews", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+   id: text("id").$defaultFn(() => createId()).primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
   providerId: varchar("provider_id").references(() => serviceProviders.id).notNull(),
   bookingId: varchar("booking_id").references(() => bookings.id),

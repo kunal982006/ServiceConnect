@@ -1,3 +1,5 @@
+// client/src/hooks/use-cart-store.ts (FIXED)
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -15,6 +17,8 @@ interface CartState {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (itemId: string) => void;
+  // --- YEH NAINA ACTION ADD KIYA ---
+  updateQuantity: (itemId: string, amount: number) => void; 
   clearCart: () => void;
   getItemCount: () => number;
   getTotalPrice: () => number;
@@ -30,16 +34,10 @@ export const useCartStore = create<CartState>()(
         const existingItem = get().items.find((item) => item.id === newItem.id);
 
         if (existingItem) {
-          // If item already exists, just increase its quantity
-          set((state) => ({
-            items: state.items.map((item) =>
-              item.id === newItem.id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-            ),
-          }));
+          // Agar item pehle se hai, toh updateQuantity ko call karo
+          get().updateQuantity(newItem.id, 1);
         } else {
-          // If it's a new item, add it to the cart with quantity 1
+          // Naya item hai, quantity 1 ke saath add karo
           set((state) => ({
             items: [...state.items, { ...newItem, quantity: 1 }],
           }));
@@ -52,6 +50,27 @@ export const useCartStore = create<CartState>()(
           items: state.items.filter((item) => item.id !== itemId),
         }));
       },
+
+      // --- YEH HAI POORA NAYA LOGIC ---
+      // Action to update quantity (increase or decrease)
+      updateQuantity: (itemId, amount) => {
+        set((state) => ({
+          items: state.items
+            .map((item) => {
+              if (item.id === itemId) {
+                const newQuantity = item.quantity + amount;
+                // Agar quantity 0 ya usse kam ho jaye, toh item ko remove kar do
+                if (newQuantity <= 0) {
+                  return null; // Isko baad me filter kar denge
+                }
+                return { ...item, quantity: newQuantity };
+              }
+              return item;
+            })
+            .filter((item): item is CartItem => item !== null), // null items ko hata do
+        }));
+      },
+      // --- NAYA LOGIC YAHAN KHATAM ---
 
       // Action to clear the entire cart
       clearCart: () => {

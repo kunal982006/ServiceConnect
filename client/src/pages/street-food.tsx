@@ -67,14 +67,19 @@ export default function StreetFood() {
   const { data: items, isLoading: loadingItems } = useQuery<any[]>({
     queryKey: ["/api/street-food-items", searchTerm],
     queryFn: async () => {
-      const res = await fetch(`/api/street-food-items?search=${searchTerm}`);
+      // ✅ Naya, Smarter URL
+      const url = searchTerm
+        ? `/api/street-food-items?search=${encodeURIComponent(searchTerm)}`
+        : "/api/street-food-items";
+
+      const res = await fetch(url); // Sahi URL use karna
+
       if (!res.ok) {
         throw new Error('Failed to fetch street food items');
       }
       return res.json();
     },
   });
-
   const filteredItems = items?.filter((item) => {
     if (selectedCategory !== "all" && item.category !== selectedCategory) return false;
     if (selectedSpiceLevel !== "all" && item.spicyLevel !== selectedSpiceLevel) return false;

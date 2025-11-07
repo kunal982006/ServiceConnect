@@ -301,6 +301,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // --- NAYA GROCERY PRODUCTS ROUTE ---
+  app.get("/api/grocery-products", async (req: Request, res: Response) => {
+    try {
+      const { category, search } = req.query;
+      const products = await storage.getGroceryProducts(category as string, search as string);
+      res.json(products);
+    } catch (error: any) {
+      console.error("Get grocery products error:", error);
+      res.status(500).json({ message: error.message || "Error fetching grocery products" });
+    }
+  });
+
   app.post("/api/table-bookings", async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
@@ -317,6 +329,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Create table booking error:", error);
       res.status(400).json({ message: error.message || "Error creating table booking" });
+    }
+  });
+  
+  app.get("/api/street-food-items", async (req: Request, res: Response) => {
+    try {
+      // search aur providerId 'query parameters' se nikaalo
+      const { search, providerId } = req.query;
+
+      const items = await storage.getStreetFoodItems(providerId as string, search as string);
+      res.json(items);
+    } catch (error: any) {
+      console.error("Get street food items error:", error);
+      res.status(500).json({ message: error.message || "Error fetching street food items" });
+    }
+  });
+
+  // --- NAYE MENU MANAGEMENT ROUTES ---
+
+  // Naya menu item add karne ke liye (POST request)
+  app.post("/api/provider/menu-items/:categorySlug", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id; // isProvider middleware se ID mil jayegi
+      const categorySlug = req.params.categorySlug;
+      const itemData = req.body;
+
+      // storage function ko call karke item create karo
+      const newItem = await storage.createMenuItem(itemData, providerId, categorySlug);
+
+      res.status(201).json(newItem);
+    } catch (error: any) {
+      console.error(`Error creating menu item in ${req.params.categorySlug}:`, error);
+      res.status(400).json({ message: error.message || "Error creating menu item" });
+    }
+  });
+
+  // Provider ke saare menu items dekhne ke liye (GET request)
+  app.get("/api/provider/menu-items/:categorySlug", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const categorySlug = req.params.categorySlug;
+
+      const items = await storage.getProviderMenuItems(providerId, categorySlug);
+
+      res.json(items);
+    } catch (error: any) {
+      console.error(`Error fetching menu items from ${req.params.categorySlug}:`, error);
+      res.status(500).json({ message: error.message || "Error fetching menu items" });
     }
   });
 

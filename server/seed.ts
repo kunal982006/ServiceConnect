@@ -1,3 +1,5 @@
+// server/seed.ts (MODIFIED AND FIXED)
+
 import { db } from "./db";
 import bcrypt from "bcrypt";
 import { 
@@ -12,7 +14,7 @@ async function seed() {
   try {
     // Create service categories (if they don't exist)
     await db.insert(serviceCategories).values([
-      { name: "Electrician", slug: "electrician", description: "Professional electrical services" },
+      { name: "Technician & Electrician", slug: "electrician", description: "Professional electrical services" },
       { name: "Plumber", slug: "plumber", description: "Expert plumbing solutions" },
       { name: "Beauty Parlor", slug: "beauty", description: "Beauty and grooming services" },
       { name: "Cake Shop", slug: "cake-shop", description: "Custom cakes for all occasions" },
@@ -34,26 +36,29 @@ async function seed() {
       { username: "rajesh_electrician", email: "rajesh.electrician@example.com", password: hashedPassword, role: "provider", phone: "+919876543210" },
       { username: "amit_electrical", email: "amit.electrical@example.com", password: hashedPassword, role: "provider", phone: "+919876543211" },
       { username: "suresh_repairs", email: "suresh.repairs@example.com", password: hashedPassword, role: "provider", phone: "+919876543212" },
-      
+
       // Plumbers
       { username: "vikram_plumber", email: "vikram.plumber@example.com", password: hashedPassword, role: "provider", phone: "+919876543213" },
       { username: "rahul_plumbing", email: "rahul.plumbing@example.com", password: hashedPassword, role: "provider", phone: "+919876543214" },
-      
+
       // Beauty Parlors
       { username: "priya_beauty", email: "priya.beauty@example.com", password: hashedPassword, role: "provider", phone: "+919876543215" },
       { username: "sonal_salon", email: "sonal.salon@example.com", password: hashedPassword, role: "provider", phone: "+919876543216" },
-      
+
       // Cake Shops
       { username: "sweetdreams_cakes", email: "sweetdreams@example.com", password: hashedPassword, role: "provider", phone: "+919876543217" },
       { username: "cakehub_delights", email: "cakehub@example.com", password: hashedPassword, role: "provider", phone: "+919876543218" },
-      
+
       // Street Food
       { username: "chacha_chaat", email: "chacha.chaat@example.com", password: hashedPassword, role: "provider", phone: "+919876543219" },
       { username: "momos_king", email: "momos.king@example.com", password: hashedPassword, role: "provider", phone: "+919876543220" },
-      
+
       // Restaurants
       { username: "punjabi_dhaba", email: "punjabi.dhaba@example.com", password: hashedPassword, role: "provider", phone: "+919876543221" },
       { username: "chinese_wok", email: "chinese.wok@example.com", password: hashedPassword, role: "provider", phone: "+919876543222" },
+
+      // --- YEH HAI NAYA GMART USER ---
+      { username: "gmart_manager", email: "gmart@example.com", password: hashedPassword, role: "provider", phone: "+919876543223" },
     ]).onConflictDoNothing();
 
     // Fetch the users (whether just created or already existing)
@@ -63,9 +68,10 @@ async function seed() {
       "priya_beauty", "sonal_salon",
       "sweetdreams_cakes", "cakehub_delights",
       "chacha_chaat", "momos_king",
-      "punjabi_dhaba", "chinese_wok"
+      "punjabi_dhaba", "chinese_wok",
+      "gmart_manager" // --- NAYA GMART USER ADDED ---
     ];
-    
+
     const sampleUsers = [];
     for (const username of usernames) {
       const user = await db.select().from(users).where(sql`${users.username} = ${username}`).limit(1);
@@ -83,11 +89,14 @@ async function seed() {
     const cakeCat = categories.find(c => c.slug === "cake-shop");
     const streetFoodCat = categories.find(c => c.slug === "street-food");
     const restaurantCat = categories.find(c => c.slug === "restaurants");
+    const groceryCat = categories.find(c => c.slug === "grocery"); // --- NAYI GROCERY CATEGORY ---
 
     // Create service providers
     const providers = [];
 
-    // Electrician providers
+    // ... (Saare puraane providers waise hi rahenge: Electrician, Plumber, Beauty, Cake, Street Food, Restaurants) ...
+
+    // (Electrician providers... code yahaan hai)
     if (electricianCat && sampleUsers.length >= 3) {
       const electricians = await db.insert(serviceProviders).values([
         {
@@ -143,7 +152,7 @@ async function seed() {
       console.log(`✅ Created ${electricians.length} electrician providers`);
     }
 
-    // Plumber providers
+    // (Plumber providers... code yahaan hai)
     if (plumberCat && sampleUsers.length >= 5) {
       const plumbers = await db.insert(serviceProviders).values([
         {
@@ -183,7 +192,7 @@ async function seed() {
       console.log(`✅ Created ${plumbers.length} plumber providers`);
     }
 
-    // Beauty parlor providers
+    // (Beauty parlor providers... code yahaan hai)
     if (beautyCat && sampleUsers.length >= 7) {
       const beautyProviders = await db.insert(serviceProviders).values([
         {
@@ -223,7 +232,7 @@ async function seed() {
       console.log(`✅ Created ${beautyProviders.length} beauty parlor providers`);
     }
 
-    // Cake shop providers
+    // (Cake shop providers... code yahaan hai)
     if (cakeCat && sampleUsers.length >= 9) {
       const cakeShops = await db.insert(serviceProviders).values([
         {
@@ -263,7 +272,7 @@ async function seed() {
       console.log(`✅ Created ${cakeShops.length} cake shop providers`);
     }
 
-    // Street food vendors
+    // (Street food vendors... code yahaan hai)
     if (streetFoodCat && sampleUsers.length >= 11) {
       const streetFoodVendors = await db.insert(serviceProviders).values([
         {
@@ -305,7 +314,7 @@ async function seed() {
       // Add street food items
       if (streetFoodVendors.length > 0) {
         const streetFoodMenuItems = await db.insert(streetFoodItems).values([
-          // Chacha's Chaat Corner items
+          // ... (street food items ka code yahaan hai) ...
           {
             providerId: streetFoodVendors[0].id,
             name: "Pani Puri",
@@ -336,7 +345,6 @@ async function seed() {
             isAvailable: true,
             spicyLevel: "Medium",
           },
-          // Momos King items
           {
             providerId: streetFoodVendors[1].id,
             name: "Veg Steamed Momos",
@@ -373,7 +381,7 @@ async function seed() {
       }
     }
 
-    // Restaurant providers
+    // (Restaurant providers... code yahaan hai)
     if (restaurantCat && sampleUsers.length >= 13) {
       const restaurants = await db.insert(serviceProviders).values([
         {
@@ -415,7 +423,7 @@ async function seed() {
       // Add restaurant menu items
       if (restaurants.length > 0) {
         const restaurantMenu = await db.insert(restaurantMenuItems).values([
-          // Punjabi Dhaba items
+          // ... (restaurant items ka code yahaan hai) ...
           {
             providerId: restaurants[0].id,
             name: "Butter Chicken",
@@ -446,7 +454,6 @@ async function seed() {
             isAvailable: true,
             cuisine: "Indian",
           },
-          // Chinese Wok items
           {
             providerId: restaurants[1].id,
             name: "Hakka Noodles",
@@ -483,19 +490,69 @@ async function seed() {
       }
     }
 
+    // --- YEH HAI NAYA GMART PROVIDER BLOCK ---
+    let gmartProviderId: string | undefined = undefined;
+    if (groceryCat && sampleUsers.length >= 14) { // 14th user
+      const gmartProvider = await db.insert(serviceProviders).values([
+        {
+          userId: sampleUsers[13].id, // 14th user (index 13)
+          categoryId: groceryCat.id,
+          businessName: "GMart Official Store",
+          description: "Fresh groceries delivered to your doorstep.",
+          experience: 5,
+          address: "GMart Warehouse, Shirur",
+          latitude: "18.8266",
+          longitude: "74.3411",
+          rating: "4.9",
+          reviewCount: 1200,
+          serviceArea: 25,
+          isVerified: true,
+          isAvailable: true,
+          specializations: ["Fresh Produce", "Dairy", "Staples", "Fast Delivery"],
+        },
+      ]).onConflictDoNothing().returning();
+
+      if (gmartProvider.length > 0) {
+        providers.push(gmartProvider[0]);
+        gmartProviderId = gmartProvider[0].id;
+        console.log(`✅ Created GMart provider`);
+      } else {
+        // Agar provider pehle se tha, toh usko fetch kar lo
+        const existingProvider = await db.query.serviceProviders.findFirst({
+            where: (sp, { eq }) => eq(sp.userId, sampleUsers[13].id)
+        });
+        if (existingProvider) {
+            gmartProviderId = existingProvider.id;
+            console.log(`✅ Found existing GMart provider`);
+        }
+      }
+    }
+
+    // --- YEH HAI NAYA/FIXED GROCERY ITEMS BLOCK ---
+    if (!gmartProviderId) {
+      console.error("❌ GMart provider ID not found! Cannot seed grocery items.");
+      throw new Error("GMart provider setup failed.");
+    }
+
+    // Purane items delete karo
+    await db.delete(groceryProducts);
+    console.log("✅ Cleared existing grocery products");
+
     const groceryItems = await db.insert(groceryProducts).values([
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Fresh Bananas",
         description: "Premium quality ripe bananas",
-        category: "fruits", // Slug use karein
-        price: "60.00", // String format
+        category: "fruits",
+        price: "60.00",
         weight: "1 dozen",
         unit: "dozen",
         inStock: true,
         stockQuantity: 50,
-        imageUrl: 'https://m.media-amazon.com/images/I/51eb+Yc523L._SL1000_.jpg', // Image URL add kiya
+        imageUrl: 'https://m.media-amazon.com/images/I/51eb+Yc523L._SL1000_.jpg',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Fresh Apples",
         description: "Crisp and juicy red apples",
         category: "fruits",
@@ -504,9 +561,10 @@ async function seed() {
         unit: "kg",
         inStock: true,
         stockQuantity: 30,
-        imageUrl: 'https://cdn.shopify.com/s/files/1/0530/2369/products/FreshApples.jpg?v=1604130099', // Image URL add kiya
+        imageUrl: 'https://cdn.shopify.com/s/files/1/0530/2369/products/FreshApples.jpg?v=1604130099',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Whole Wheat Bread",
         description: "Freshly baked whole wheat bread",
         category: "bakery",
@@ -515,9 +573,10 @@ async function seed() {
         unit: "pack",
         inStock: true,
         stockQuantity: 30,
-        imageUrl: 'https://img.etimg.com/thumb/msid-68194451,width-1200,height-900,resizemode-4/.jpg', // Image URL add kiya
+        imageUrl: 'https://img.etimg.com/thumb/msid-68194451,width-1200,height-900,resizemode-4/.jpg',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Toned Milk",
         description: "Fresh toned milk",
         category: "dairy",
@@ -526,20 +585,22 @@ async function seed() {
         unit: "liter",
         inStock: true,
         stockQuantity: 100,
-        imageUrl: 'https://media.istockphoto.com/id/1179754291/photo/milk-glass-and-bottle-with-milk-splashes-clip-art-milk-illustration-isolated-on-white.jpg?s=612x612&w=0&k=20&c=L_Jj9S_MhQdM-v3G1I_UvK27n-l894DqK4_kR36qR1w=', // Image URL add kiya
+        imageUrl: 'https://media.istockphoto.com/id/1179754291/photo/milk-glass-and-bottle-with-milk-splashes-clip-art-milk-illustration-isolated-on-white.jpg?s=612x612&w=0&k=20&c=L_Jj9S_MhQdM-v3G1I_UvK27n-l894DqK4_kR36qR1w=',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Basmati Rice",
         description: "Premium long grain basmati rice",
-        category: "staples", // Nayi category slug (Frontend me bhi add karenge)
+        category: "staples",
         price: "180.00",
         weight: "1 kg",
         unit: "kg",
         inStock: true,
         stockQuantity: 40,
-        imageUrl: 'https://m.media-amazon.com/images/I/71u9yH0K2WL.jpg', // Example image URL
+        imageUrl: 'https://m.media-amazon.com/images/I/71u9yH0K2WL.jpg',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: "Fresh Tomatoes",
         description: "Farm fresh red tomatoes",
         category: "vegetables",
@@ -548,12 +609,13 @@ async function seed() {
         unit: "pack",
         inStock: true,
         stockQuantity: 60,
-        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/89/Tomato_je.jpg', // Image URL add kiya
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/89/Tomato_je.jpg',
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: 'Detergent Soap',
         description: 'Lifebuoy Total 10 for germ protection',
-        category: 'toiletries', // Nayi category slug
+        category: 'toiletries',
         price: '90.00',
         weight: '125g',
         unit: 'bar',
@@ -562,6 +624,7 @@ async function seed() {
         stockQuantity: 50,
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: 'Colgate Toothpaste',
         description: 'For strong teeth and fresh breath',
         category: 'toiletries',
@@ -573,9 +636,10 @@ async function seed() {
         stockQuantity: 40,
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: 'Dettol Handwash',
         description: 'Protects from 100 illness-causing germs',
-        category: 'personal-care', // Nayi category slug
+        category: 'personal-care',
         price: '180.00',
         weight: '250ml',
         unit: 'bottle',
@@ -584,6 +648,7 @@ async function seed() {
         stockQuantity: 60,
       },
       {
+        providerId: gmartProviderId, // <-- LINKED
         name: 'Dove Shampoo',
         description: 'For smooth and shiny hair',
         category: 'personal-care',
@@ -594,7 +659,7 @@ async function seed() {
         inStock: true,
         stockQuantity: 35,
       },
-    ]).onConflictDoNothing().returning(); // Yahan tak replace karo
+    ]).returning(); // .onConflictDoNothing() hata diya kyunki hum pehle delete kar rahe hain
 
 
     console.log(`✅ Created ${groceryItems.length} grocery items`);

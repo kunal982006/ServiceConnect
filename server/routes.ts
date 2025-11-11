@@ -1,8 +1,7 @@
-// server/routes.ts (FINAL & COMPLETE CODE)
+// server/routes.ts (UPDATED FOR ELECTRICIAN FLOW)
 
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import Stripe from "stripe";
 import bcrypt from "bcrypt";
 import { uploadToCloudinary } from './cloudinary';
 import multer from 'multer';
@@ -16,25 +15,21 @@ import {
   insertRentalPropertySchema,
   insertTableBookingSchema,
   insertServiceProviderSchema,
+  insertInvoiceSchema, // NAYA IMPORT
 } from "@shared/schema";
 
-// Initialize Stripe (only if API key is available)
-let stripe: Stripe | null = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    // FIX: Using the exact version string your editor requires
-    apiVersion: "2025-09-30.clover",
-  });
-}
+import { razorpayInstance, verifyPaymentSignature } from "./razorpay-client";
 
-// Twilio for call routing (if available)
+// NAYA IMPORT: z for validation
+import { z } from "zod";
+
 let twilioClient: any = null;
 if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
   const twilio = require('twilio');
   twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 }
 
-// Custom Request type for middleware
+// Custom request types
 interface CustomRequest extends Request {
   provider?: {
     id: string;
@@ -42,46 +37,52 @@ interface CustomRequest extends Request {
     categoryId: string;
   };
 }
+interface AuthRequest extends Request {
+  userId?: string;
+}
 
-// Middleware to check if user is a provider
-const isProvider = async (req: CustomRequest, res: Response, next: NextFunction) => {
-  const userId = req.session.userId;
-  if (!userId) {
+// Middleware: Check if user is logged in
+const isLoggedIn = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
     return res.status(401).json({ message: "Aap logged in nahi hain." });
   }
-
-  const provider = await storage.getProviderByUserId(userId);
-  if (!provider) {
-    return res.status(403).json({ message: "Aap ek service provider nahi hain." });
-  }
-
-  req.provider = provider;
+  req.userId = req.session.userId;
   next();
 };
 
+// Middleware: Check if user is a provider
+const isProvider = async (req: CustomRequest, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Aap logged in nahi hain." });
+  }
+  const provider = await storage.getProviderByUserId(req.session.userId);
+  if (!provider) {
+    return res.status(403).json({ message: "Aap ek service provider nahi hain." });
+  }
+  req.provider = provider;
+  req.userId = req.session.userId;
+  next();
+};
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
 
-  // --- AUTHENTICATION ROUTES ---
+  // --- AUTHENTICATION ROUTES (No Change) ---
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
       const { username, email, password, role, phone } = req.body;
-
       if (!username || !email || !password || !role) {
         return res.status(400).json({ message: "Username, email, password, and role are required." });
       }
-
       const existingUser = await storage.getUserByUsername(username.toLowerCase());
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
-
       const existingEmail = await storage.getUserByEmail(email);
       if (existingEmail) {
         return res.status(400).json({ message: "Email already exists" });
       }
-
       const hashedPassword = await bcrypt.hash(password, 10);
-
       const user = await storage.createUser({
         username: username.toLowerCase(),
         email,
@@ -89,11 +90,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: role || "customer",
         phone,
       });
-
       req.session.userId = user.id;
-      // FIX: Ensure a string is always assigned to prevent type mismatch
       req.session.userRole = user.role || 'customer';
-
       req.session.save((err) => {
         if (err) {
           console.error("Session save error after signup:", err);
@@ -102,7 +100,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { password: _, ...userWithoutPassword } = user;
         res.status(201).json({ user: userWithoutPassword, message: "Signed up and logged in successfully!" });
       });
-
     } catch (error: any) {
       console.error("Signup error:", error);
       res.status(500).json({ message: error.message || "Error during signup" });
@@ -110,29 +107,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
-    console.log("LOGIN ATTEMPT RECEIVED BODY:", req.body);
     try {
       const { username, password } = req.body;
-
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password are required." });
       }
-
       const user = await storage.getUserByUsername(username.toLowerCase());
-
       if (!user) {
         await bcrypt.compare("dummyPassword", "$2b$10$abcdefghijklmnopqrstuv");
         return res.status(401).json({ message: "Invalid username or password" });
       }
-
       const validPassword = await bcrypt.compare(password, user.password);
       if (!validPassword) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
-
       req.session.userId = user.id;
       req.session.userRole = user.role || 'customer';
-
       req.session.save((err) => {
         if (err) {
           console.error("Session save error after login:", err);
@@ -141,7 +131,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { password: _, ...userWithoutPassword } = user;
         res.json({ user: userWithoutPassword, message: "Logged in successfully!" });
       });
-
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(500).json({ message: error.message || "Error during login" });
@@ -165,7 +154,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(401).json({ user: null, message: "Not authenticated" });
       }
-
       const user = await storage.getUser(userId);
       if (!user) {
         req.session.destroy(() => {
@@ -174,7 +162,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         return;
       }
-
       const { password: _, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error: any) {
@@ -183,13 +170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- PROVIDER PROFILE ROUTES ---
-  app.post("/api/provider/profile", async (req: Request, res: Response) => {
+  // --- PROVIDER PROFILE ROUTES (No Change) ---
+  app.post("/api/provider/profile", isLoggedIn, async (req: AuthRequest, res: Response) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
+      const userId = req.userId!;
       const providerData = insertServiceProviderSchema.parse(req.body);
       const { categoryId } = req.body;
       const provider = await storage.createServiceProvider({ ...providerData, userId, categoryId });
@@ -200,39 +184,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ✅ YEH NAYA, FINAL CODE PASTE KARNA HAI ✅
-  app.get("/api/provider/profile", async (req: Request, res: Response) => {
+  app.get("/api/provider/profile", isLoggedIn, async (req: AuthRequest, res: Response) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      // Hum ab direct 'getServiceProvider' function use karenge,
-      // jo humein user ki ID se poori profile (category ke saath) laakar dega.
-      // Iske liye humein pehle user object laana padega.
+      const userId = req.userId!;
       const provider = await storage.getProviderByUserId(userId);
-
       if (!provider) {
         return res.status(404).json({ message: "Provider profile not found" });
       }
-
-      // provider.id ka use karke poori details laao
       const fullProfile = await storage.getServiceProvider(provider.id);
-
       if (!fullProfile) {
         return res.status(404).json({ message: "Could not retrieve full provider profile." });
       }
-
       res.json(fullProfile);
-
     } catch (error: any) {
       console.error("Get provider profile error:", error);
       res.status(500).json({ message: error.message || "Error fetching provider profile" });
     }
   });
 
-  // --- GENERAL SERVICE ROUTES ---
+  app.patch("/api/provider/profile", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { profileImageUrl, galleryImages, ...updates } = req.body;
+
+      const updatedProfile = await storage.updateServiceProvider(providerId, updates);
+      if (!updatedProfile) {
+        return res.status(404).json({ message: "Profile not found." });
+      }
+      res.json(updatedProfile);
+    } catch (error: any) {
+      console.error("Update provider profile error:", error);
+      res.status(500).json({ message: error.message || "Error updating provider profile" });
+    }
+  });
+
+  app.patch(
+    "/api/provider/profile/image",
+    isProvider,
+    upload.single("image"),
+    async (req: CustomRequest, res: Response) => {
+      try {
+        const providerId = req.provider!.id;
+        const file = req.file;
+
+        if (!file) {
+          return res.status(400).json({ message: "Koi image file nahi mili." });
+        }
+        const imageUrl = await uploadToCloudinary(file.buffer);
+        const updatedProfile = await storage.updateServiceProvider(providerId, {
+          profileImageUrl: imageUrl,
+        });
+
+        res.json({ message: "Profile image updated!", profile: updatedProfile });
+      } catch (error: any) {
+        console.error("Profile image upload error:", error);
+        res.status(500).json({ message: error.message || "Error uploading image" });
+      }
+    }
+  );
+
+  app.post(
+    "/api/provider/profile/gallery",
+    isProvider,
+    upload.array("images", 5),
+    async (req: CustomRequest, res: Response) => {
+      try {
+        const providerId = req.provider!.id;
+        const files = req.files as Express.Multer.File[];
+
+        if (!files || files.length === 0) {
+          return res.status(400).json({ message: "Koi image files nahi mili." });
+        }
+
+        const uploadPromises = files.map(file => uploadToCloudinary(file.buffer));
+        const imageUrls = await Promise.all(uploadPromises);
+
+        const currentProfile = await storage.getServiceProvider(providerId);
+        const existingGallery = currentProfile?.galleryImages || [];
+        const updatedGallery = [...existingGallery, ...imageUrls];
+
+        const updatedProfile = await storage.updateServiceProvider(providerId, {
+          galleryImages: updatedGallery,
+        });
+
+        res.json({ message: "Gallery images updated!", profile: updatedProfile });
+      } catch (error: any) {
+        console.error("Gallery image upload error:", error);
+        res.status(500).json({ message: error.message || "Error uploading gallery images" });
+      }
+    }
+  );
+
+  // --- GENERAL SERVICE ROUTES (No Change) ---
   app.get("/api/service-categories", async (_req: Request, res: Response) => {
     try {
       const categories = await storage.getServiceCategories();
@@ -240,6 +283,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Get service categories error:", error);
       res.status(500).json({ message: error.message || "Error fetching service categories" });
+    }
+  });
+
+  app.get("/api/service-problems", async (req: Request, res: Response) => {
+    try {
+      const { category: categorySlug, parentId } = req.query; 
+
+      if (!categorySlug) {
+        return res.status(400).json({ message: "Category slug is required" });
+      }
+
+      const category = await storage.getServiceCategory(categorySlug as string);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      const problems = await storage.getServiceProblems(category.id, parentId as string | undefined); 
+      res.json(problems);
+    } catch (error: any) {
+      console.error("Get service problems error:", error);
+      res.status(500).json({ message: error.message || "Error fetching service problems" });
     }
   });
 
@@ -270,13 +334,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- BOOKING & ORDER ROUTES ---
-  app.post("/api/bookings", async (req: Request, res: Response) => {
+
+  // --- BOOKING & ORDER ROUTES (UPDATED) ---
+
+  // (Customer) Booking create karna
+  app.post("/api/bookings", isLoggedIn, async (req: AuthRequest, res: Response) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated for booking." });
-      }
+      const userId = req.userId!;
       const bookingData = insertBookingSchema.parse(req.body);
       const booking = await storage.createBooking({ ...bookingData, userId });
       res.status(201).json(booking);
@@ -286,12 +350,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/grocery-orders", async (req: Request, res: Response) => {
+  // (Customer) Apni booking cancel karna
+  app.patch("/api/bookings/:id/cancel", isLoggedIn, async (req: AuthRequest, res: Response) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated for ordering." });
+      const userId = req.userId!;
+      const { id: bookingId } = req.params;
+
+      const booking = await storage.getBooking(bookingId);
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking nahi mili." });
       }
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Aap yeh booking cancel nahi kar sakte." });
+      }
+      if (booking.status !== 'pending') {
+        return res.status(400).json({ message: `Aap '${booking.status}' booking ko cancel nahi kar sakte.` });
+      }
+
+      const cancelledBooking = await storage.updateBookingStatus(bookingId, "cancelled");
+      res.json(cancelledBooking);
+
+    } catch (error: any) {
+      console.error("Cancel booking error:", error);
+      res.status(500).json({ message: error.message || "Error cancelling booking" });
+    }
+  });
+
+  // (Provider) Booking accept karna
+  app.patch("/api/bookings/:id/accept", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { id: bookingId } = req.params;
+
+      const booking = await storage.getBooking(bookingId);
+      if (!booking || booking.providerId !== providerId) {
+         return res.status(404).json({ message: "Booking nahi mili ya aapke liye nahi hai." });
+      }
+       if (booking.status !== 'pending') {
+        return res.status(400).json({ message: `Yeh booking already '${booking.status}' hai.` });
+      }
+
+      const acceptedBooking = await storage.updateBookingStatus(bookingId, "accepted", providerId);
+      res.json(acceptedBooking);
+    } catch (error: any) {
+      console.error("Accept booking error:", error);
+      res.status(500).json({ message: error.message || "Error accepting booking" });
+    }
+  });
+
+  // (Provider) Booking decline karna
+  app.patch("/api/bookings/:id/decline", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { id: bookingId } = req.params;
+
+      const booking = await storage.getBooking(bookingId);
+      if (!booking || booking.providerId !== providerId) {
+         return res.status(404).json({ message: "Booking nahi mili ya aapke liye nahi hai." });
+      }
+      if (booking.status !== 'pending') {
+        return res.status(400).json({ message: `Yeh booking already '${booking.status}' hai.` });
+      }
+
+      const declinedBooking = await storage.updateBookingStatus(bookingId, "declined");
+      res.json(declinedBooking);
+    } catch (error: any) {
+      console.error("Decline booking error:", error);
+      res.status(500).json({ message: error.message || "Error declining booking" });
+    }
+  });
+
+
+  // --- NAYE ELECTRICIAN FLOW KE API ENDPOINTS ---
+
+  // (Provider) Job start karna (status = 'in_progress')
+  app.patch("/api/bookings/:id/start-job", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { id: bookingId } = req.params;
+      const booking = await storage.getBooking(bookingId);
+
+      if (!booking || booking.providerId !== providerId) {
+        return res.status(404).json({ message: "Booking not found or access denied" });
+      }
+      if (booking.status !== 'accepted') {
+        return res.status(400).json({ message: "Job accept karne ke baad hi start kar sakte hain." });
+      }
+
+      const updatedBooking = await storage.updateBookingStatus(bookingId, 'in_progress');
+      res.json(updatedBooking);
+    } catch (error: any) {
+      console.error("Start job error:", error);
+      res.status(500).json({ message: error.message || "Error starting job" });
+    }
+  });
+
+  // (Provider) Job done, OTP generate karna (status = 'awaiting_otp')
+  app.post("/api/bookings/:id/generate-otp", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { id: bookingId } = req.params;
+
+      const { otp, userPhone } = await storage.generateOtpForBooking(bookingId, providerId);
+
+      res.json({ message: `OTP ${otp} customer ke phone ${userPhone} par bhej diya gaya hai.` });
+    } catch (error: any)
+    {
+      console.error("Generate OTP error:", error);
+      res.status(500).json({ message: error.message || "Error generating OTP" });
+    }
+  });
+
+  // (Provider) OTP Verify karna (status = 'awaiting_billing')
+  app.post("/api/bookings/:id/verify-otp", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const { id: bookingId } = req.params;
+      const { otp } = z.object({ otp: z.string().length(6) }).parse(req.body);
+
+      const updatedBooking = await storage.verifyBookingOtp(bookingId, providerId, otp);
+
+      res.json({ message: "OTP verified successfully! Ab aap bill bana sakte hain.", booking: updatedBooking });
+    } catch (error: any) {
+      console.error("Verify OTP error:", error);
+      res.status(400).json({ message: error.message || "Error verifying OTP" });
+    }
+  });
+
+  // (Provider) Final bill/invoice create karna (status = 'pending_payment')
+  app.post("/api/bookings/:id/create-invoice", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const providerId = req.provider!.id;
+      const userId = req.provider!.userId; // Provider ka user ID nahi, customer ka ID chahiye
+      const { id: bookingId } = req.params;
+
+      const booking = await storage.getBooking(bookingId);
+      if (!booking || booking.providerId !== providerId) {
+        return res.status(404).json({ message: "Booking not found or access denied" });
+      }
+      if (booking.status !== 'awaiting_billing') {
+        return res.status(400).json({ message: `Cannot create bill for booking with status: ${booking.status}` });
+      }
+
+      // Zod se validation
+      const billSchema = z.object({
+        serviceCharge: z.number().min(0),
+        spareParts: z.array(z.object({
+          part: z.string().min(1),
+          cost: z.number().min(0),
+        })).optional(),
+      });
+
+      const { serviceCharge, spareParts } = billSchema.parse(req.body);
+
+      const sparePartsTotal = spareParts?.reduce((sum, part) => sum + part.cost, 0) || 0;
+      const totalAmount = sparePartsTotal + serviceCharge;
+
+      const invoiceData: InsertInvoice = {
+        bookingId: bookingId,
+        providerId: providerId,
+        userId: booking.userId, // Customer ka user ID
+        sparePartsDetails: spareParts || [],
+        sparePartsTotal: sparePartsTotal.toString(),
+        serviceCharge: serviceCharge.toString(),
+        totalAmount: totalAmount.toString(),
+      };
+
+      const newInvoice = await storage.createInvoiceForBooking(invoiceData);
+
+      res.status(201).json({ message: "Bill create ho gaya. Customer ab pay kar sakta hai.", invoice: newInvoice });
+    } catch (error: any) {
+      console.error("Create invoice error:", error);
+      res.status(400).json({ message: error.message || "Error creating invoice" });
+    }
+  });
+
+  // (Customer) Invoice ke liye payment order create karna
+  app.post("/api/invoices/:id/create-payment-order", isLoggedIn, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const { id: invoiceId } = req.params;
+
+      const { razorpayOrderId, amount, currency, invoice } = await storage.createPaymentOrderForInvoice(invoiceId, userId);
+
+      res.json({
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+        razorpayOrderId,
+        amount,
+        currency,
+        invoice,
+      });
+    } catch (error: any) {
+      console.error("Create invoice payment error:", error);
+      res.status(500).json({ message: error.message || "Error creating payment order" });
+    }
+  });
+
+  // (Customer) Invoice payment verify karna (status = 'completed')
+  app.post("/api/invoices/verify-payment", isLoggedIn, async (req: AuthRequest, res: Response) => {
+    try {
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoice_id } = req.body;
+
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !invoice_id) {
+        return res.status(400).json({ message: "Missing payment details for verification" });
+      }
+
+      const isValid = verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+
+      if (isValid) {
+        const updatedInvoice = await storage.verifyInvoicePayment(
+          invoice_id,
+          razorpay_payment_id,
+          razorpay_order_id,
+          razorpay_signature
+        );
+        res.json({ status: "success", message: "Payment verified successfully!", invoice: updatedInvoice });
+      } else {
+        res.status(400).json({ status: "failure", message: "Invalid payment signature" });
+      }
+    } catch (error: any) {
+      console.error("Verify invoice payment error:", error);
+      res.status(500).json({ message: error.message || "Error verifying payment" });
+    }
+  });
+
+
+  // --- BAAKI ROUTES (Grocery, Restaurant, etc.) ---
+
+  app.post("/api/grocery-orders", isLoggedIn, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
       const orderData = insertGroceryOrderSchema.parse(req.body);
       const order = await storage.createGroceryOrder({ ...orderData, userId });
       res.status(201).json(order);
@@ -301,24 +590,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- NAYA GROCERY PRODUCTS ROUTE ---
-  app.get("/api/grocery-products", async (req: Request, res: Response) => {
+  // (Grocery Payment)
+  app.post("/api/payment/create-order", isLoggedIn, async (req: AuthRequest, res: Response) => {
     try {
-      const { category, search } = req.query;
-      const products = await storage.getGroceryProducts(category as string, search as string);
-      res.json(products);
+      const userId = req.userId!;
+      const { orderId } = req.body; 
+      if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+      const order = await storage.getGroceryOrder(orderId);
+      if (!order || order.userId !== userId) {
+        return res.status(404).json({ message: "Order not found or does not belong to user" });
+      }
+      if (order.status !== 'pending') {
+        return res.status(400).json({ message: "This order has already been processed." });
+      }
+      const amountInPaise = Math.round(parseFloat(order.total) * 100);
+      const options = {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: order.id,
+        notes: {
+          databaseOrderId: order.id,
+          userId: userId,
+        }
+      };
+      const razorpayOrder = await razorpayInstance.orders.create(options);
+      await storage.updateOrderWithRazorpayOrderId(order.id, razorpayOrder.id);
+      res.json({
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+        razorpayOrderId: razorpayOrder.id,
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+      });
     } catch (error: any) {
-      console.error("Get grocery products error:", error);
-      res.status(500).json({ message: error.message || "Error fetching grocery products" });
+      console.error("Create Razorpay order error:", error);
+      res.status(500).json({ message: error.message || "Error creating Razorpay order" });
     }
   });
 
-  app.post("/api/table-bookings", async (req: Request, res: Response) => {
+  // (Grocery Payment Verify)
+  app.post("/api/payment/verify-signature", async (req: Request, res: Response) => {
     try {
-      const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated for table booking." });
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, database_order_id } = req.body;
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !database_order_id) {
+        return res.status(400).json({ message: "Missing payment details for verification" });
       }
+      const isValid = verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      if (isValid) {
+        await storage.verifyAndUpdateOrderPayment(
+          database_order_id,
+          razorpay_payment_id,
+          razorpay_signature
+        );
+        res.json({ status: "success", message: "Payment verified successfully", orderId: database_order_id });
+      } else {
+        res.status(400).json({ status: "failure", message: "Invalid payment signature" });
+      }
+    } catch (error: any) {
+      console.error("Verify payment error:", error);
+      res.status(500).json({ message: error.message || "Error verifying payment" });
+    }
+  });
+
+  app.post("/api/table-bookings", isLoggedIn, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
       const validatedData = insertTableBookingSchema.parse(req.body);
       const booking = await storage.createTableBooking({
         ...validatedData,
@@ -331,12 +668,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: error.message || "Error creating table booking" });
     }
   });
-  
+
   app.get("/api/street-food-items", async (req: Request, res: Response) => {
     try {
-      // search aur providerId 'query parameters' se nikaalo
       const { search, providerId } = req.query;
-
       const items = await storage.getStreetFoodItems(providerId as string, search as string);
       res.json(items);
     } catch (error: any) {
@@ -345,18 +680,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // --- NAYE MENU MANAGEMENT ROUTES ---
+  app.get("/api/restaurant-menu-items", async (req: Request, res: Response) => {
+    try {
+      const items = await storage.getRestaurantMenuItems(); 
+      res.json(items);
+    } catch (error: any) {
+      console.error("Get restaurant menu items error:", error);
+      res.status(500).json({ message: error.message || "Error fetching restaurant menu items" });
+    }
+  });
 
-  // Naya menu item add karne ke liye (POST request)
+  app.get("/api/grocery-products", async (req: Request, res: Response) => {
+    try {
+      const { providerId, search } = req.query;
+      if (!providerId) {
+        return res.status(400).json({ message: "Provider ID is required" });
+      }
+      const products = await storage.getGroceryProducts(providerId as string, search as string);
+      res.json(products);
+    } catch (error: any) {
+      console.error("Get grocery products error:", error);
+      res.status(500).json({ message: error.message || "Error fetching grocery products" });
+    }
+  });
+
+  // --- MENU MANAGEMENT ROUTES (No Change) ---
   app.post("/api/provider/menu-items/:categorySlug", isProvider, async (req: CustomRequest, res: Response) => {
     try {
-      const providerId = req.provider!.id; // isProvider middleware se ID mil jayegi
+      const providerId = req.provider!.id; 
       const categorySlug = req.params.categorySlug;
       const itemData = req.body;
-
-      // storage function ko call karke item create karo
       const newItem = await storage.createMenuItem(itemData, providerId, categorySlug);
-
       res.status(201).json(newItem);
     } catch (error: any) {
       console.error(`Error creating menu item in ${req.params.categorySlug}:`, error);
@@ -364,18 +718,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Provider ke saare menu items dekhne ke liye (GET request)
   app.get("/api/provider/menu-items/:categorySlug", isProvider, async (req: CustomRequest, res: Response) => {
     try {
       const providerId = req.provider!.id;
       const categorySlug = req.params.categorySlug;
-
       const items = await storage.getProviderMenuItems(providerId, categorySlug);
-
       res.json(items);
     } catch (error: any) {
       console.error(`Error fetching menu items from ${req.params.categorySlug}:`, error);
       res.status(500).json({ message: error.message || "Error fetching menu items" });
+    }
+  });
+
+  app.patch("/api/provider/menu-items/:categorySlug/:itemId", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const { categorySlug, itemId } = req.params;
+      const providerId = req.provider!.id; 
+      const updates = req.body;
+      const updatedItem = await storage.updateMenuItem(itemId, providerId, categorySlug, updates);
+      if (!updatedItem) {
+        return res.status(404).json({ message: "Item not found or you don't have permission." });
+      }
+      res.json(updatedItem);
+    } catch (error: any) {
+      console.error(`Error updating menu item in ${req.params.categorySlug}:`, error);
+      res.status(400).json({ message: error.message || "Error updating menu item" });
+    }
+  });
+
+  app.delete("/api/provider/menu-items/:categorySlug/:itemId", isProvider, async (req: CustomRequest, res: Response) => {
+    try {
+      const { categorySlug, itemId } = req.params;
+      const providerId = req.provider!.id; 
+      const deletedItem = await storage.deleteMenuItem(itemId, providerId, categorySlug);
+      if (!deletedItem) {
+        return res.status(404).json({ message: "Item not found or you don't have permission." });
+      }
+      res.json({ message: "Item deleted successfully", id: deletedItem.id });
+    } catch (error: any) {
+      console.error(`Error deleting menu item in ${req.params.categorySlug}:`, error);
+      res.status(500).json({ message: error.message || "Error deleting menu item" });
     }
   });
 

@@ -1,3 +1,5 @@
+// client/src/pages/restaurants.tsx (FIXED AND CLEANED)
+
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -11,7 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, UtensilsCrossed, Star, MapPin, Phone, Clock, Calendar, Users, Leaf } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, Star, MapPin, Phone, Clock, Calendar, Users, Leaf, Loader2 } from "lucide-react";
+import type { ServiceProvider, User, ServiceCategory, RestaurantMenuItem } from "@shared/schema";
+
+// Type definitions
+type RestaurantProvider = ServiceProvider & { user: User; category: ServiceCategory };
 
 const cuisineTypes = [
   { value: "all", label: "All Cuisines" },
@@ -47,7 +53,7 @@ export default function Restaurants() {
   const [selectedCuisine, setSelectedCuisine] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [vegOnly, setVegOnly] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantProvider | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
 
   // Booking form state
@@ -56,17 +62,29 @@ export default function Restaurants() {
   const [numberOfGuests, setNumberOfGuests] = useState("2");
   const [specialRequests, setSpecialRequests] = useState("");
 
-  const { data: restaurants, isLoading: loadingRestaurants } = useQuery<any[]>({
-    queryKey: ["/api/service-providers", "restaurants"],
+  // --- Restaurant query (FIXED) ---
+  const { data: restaurants, isLoading: loadingRestaurants } = useQuery<RestaurantProvider[]>({
+    queryKey: ["restaurantsList", "restaurants"], 
+    queryFn: () => 
+      apiRequest("GET", "/api/service-providers?category=restaurants")
+        .then(res => res.json()),
   });
 
-  const { data: allMenuItems, isLoading: loadingMenu } = useQuery<any[]>({
-    queryKey: ["/api/restaurant-menu-items"],
+  // --- Menu items query (FIXED) ---
+  const { data: allMenuItems, isLoading: loadingMenu } = useQuery<RestaurantMenuItem[]>({
+    queryKey: ["allRestaurantMenuItems"], 
+    queryFn: () => 
+      apiRequest("GET", "/api/restaurant-menu-items") 
+        .then(res => res.json()),
   });
 
   const bookingMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", `/api/table-bookings`, data);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Booking failed");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -76,12 +94,12 @@ export default function Restaurants() {
       });
       setBookingOpen(false);
       resetBookingForm();
-      queryClient.invalidateQueries({ queryKey: ["/api/table-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["userTableBookings"] }); 
     },
     onError: (error: any) => {
       toast({
         title: "Booking Failed",
-        description: error.message || "Failed to create booking",
+        description: error.message || "Failed to create booking. Are you logged in?",
         variant: "destructive",
       });
     },
@@ -105,7 +123,7 @@ export default function Restaurants() {
     }
 
     bookingMutation.mutate({
-      providerId: selectedRestaurant.id,
+      providerId: selectedRestaurant?.id,
       date: new Date(bookingDate),
       timeSlot,
       numberOfGuests: parseInt(numberOfGuests),
@@ -116,7 +134,12 @@ export default function Restaurants() {
   // Filter menu items
   const filteredMenuItems = allMenuItems?.filter((item) => {
     if (selectedCategory !== "all" && item.category !== selectedCategory) return false;
-    if (selectedCuisine !== "all" && item.cuisine !== selectedCuisine) return false;
+
+    const restaurantForThisItem = restaurants?.find(r => r.id === item.providerId);
+    if (!restaurantForThisItem) return false; // Agar restaurant nahi mila toh item mat dikhao
+
+    if (selectedCuisine !== "all" && !restaurantForThisItem.specializations?.includes(selectedCuisine)) return false;
+
     if (vegOnly && !item.isVeg) return false;
     return true;
   }) || [];
@@ -132,7 +155,7 @@ export default function Restaurants() {
               Back to Home
             </Button>
           </Link>
-          
+
           <div className="flex items-center gap-3 mb-4">
             <UtensilsCrossed className="h-12 w-12" />
             <h1 className="text-4xl md:text-5xl font-bold">Restaurants</h1>
@@ -161,7 +184,7 @@ export default function Restaurants() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex-1">
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger data-testid="select-category">
@@ -194,7 +217,7 @@ export default function Restaurants() {
       <section className="py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold mb-8">Top Restaurants Near You</h2>
-          
+
           {loadingRestaurants ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
@@ -227,14 +250,14 @@ export default function Restaurants() {
                         </div>
                       )}
                     </div>
-                    
+
                     {restaurant.description && (
                       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                         {restaurant.description}
                       </p>
                     )}
-                    
-                    <div className="flex gap-2 mb-4">
+
+                    <div className="flex flex-wrap gap-2 mb-4">
                       {restaurant.specializations?.slice(0, 3).map((spec: string, idx: number) => (
                         <Badge key={idx} variant="secondary" className="text-xs">
                           {spec}
@@ -246,6 +269,7 @@ export default function Restaurants() {
                       <Dialog open={bookingOpen && selectedRestaurant?.id === restaurant.id} onOpenChange={(open) => {
                         setBookingOpen(open);
                         if (open) setSelectedRestaurant(restaurant);
+                        if (!open) resetBookingForm(); 
                       }}>
                         <DialogTrigger asChild>
                           <Button className="flex-1" data-testid={`button-book-${restaurant.id}`}>
@@ -312,7 +336,7 @@ export default function Restaurants() {
                               disabled={bookingMutation.isPending}
                               data-testid="button-confirm-booking"
                             >
-                              {bookingMutation.isPending ? "Booking..." : "Confirm Booking"}
+                              {bookingMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Booking...</> : "Confirm Booking"}
                             </Button>
                           </div>
                         </DialogContent>
@@ -341,7 +365,7 @@ export default function Restaurants() {
       <section className="py-12 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold mb-8">Popular Dishes</h2>
-          
+
           {loadingMenu ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map((i) => (
@@ -383,13 +407,13 @@ export default function Restaurants() {
                         )}
                       </div>
                     </div>
-                    
+
                     {item.description && (
                       <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                         {item.description}
                       </p>
                     )}
-                    
+
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xl font-bold text-primary">₹{item.price}</span>
                       {item.cuisine && (
@@ -398,7 +422,7 @@ export default function Restaurants() {
                         </Badge>
                       )}
                     </div>
-                    
+
                     {item.category && (
                       <Badge variant="secondary" className="text-xs mb-3">
                         {item.category}

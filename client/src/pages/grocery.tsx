@@ -1,4 +1,4 @@
-// client/src/pages/Grocery.tsx
+// client/src/pages/Grocery.tsx (MODIFIED FOR providerId)
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -6,11 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ProductCard from "@/components/grocery/product-card";
-// --- BADLAV: CartSummary ko hata diya, ab inline summary hai ---
-// import CartSummary from "@/components/grocery/cart-summary";
-// --- BADLAV: useCart ki jagah useCartStore import kiya ---
 import { useCartStore } from "@/hooks/use-cart-store";
-import { useToast } from "@/hooks/use-toast"; // Toast ko bhi import kiya
+import { useToast } from "@/hooks/use-toast";
 
 import {
   ArrowLeft,
@@ -23,11 +20,12 @@ import {
   Cookie,
   Coffee,
   ShoppingBag,
-  Sparkles,// Naya icon add kiya
+  Sparkles,
+  Loader2, // Loader icon add kiya
 } from "lucide-react";
+import type { ServiceProvider, User, ServiceCategory, GroceryProduct } from "@shared/schema"; // Types import kiye
 
-
-// --- YEH WALA 'categories' ARRAY UPDATE KARO ---
+// Categories list wahi rahegi
 const categories = [
   { name: "Fruits", icon: Apple, slug: "fruits" },
   { name: "Vegetables", icon: Carrot, slug: "vegetables" },
@@ -35,15 +33,35 @@ const categories = [
   { name: "Bakery", icon: Croissant, slug: "bakery" },
   { name: "Snacks", icon: Cookie, slug: "snacks" },
   { name: "Beverages", icon: Coffee, slug: "beverages" },
-  { name: "Staples", icon: ShoppingBag, slug: "staples" }, // Nayi category
-  { name: "Toiletries", icon: Sparkles, slug: "toiletries" }, // Nayi category
-  { name: "Personal Care", icon: Sparkles, slug: "personal-care" }, // Nayi category (Sparkles icon use kiya, aap badal sakte ho)
+  { name: "Staples", icon: ShoppingBag, slug: "staples" },
+  { name: "Toiletries", icon: Sparkles, slug: "toiletries" },
+  { name: "Personal Care", icon: Sparkles, slug: "personal-care" },
 ];
 
-// API function to fetch grocery products (queryKey ko deconstruct karke use kiya)
-const fetchGroceryProducts = async ({ queryKey }: { queryKey: (string | { category: string, search: string })[] }) => {
-  const [, { category, search }] = queryKey;
-  const url = `/api/grocery-products?${category ? `category=${category}` : ''}${search ? `&search=${search}` : ''}`;
+// Type define kiya service provider ke liye
+type GMartProvider = ServiceProvider & { user: User; category: ServiceCategory };
+
+// API function GMart provider ko fetch karne ke liye
+const fetchGmartProvider = async (): Promise<GMartProvider | undefined> => {
+  const res = await fetch(`/api/service-providers?category=grocery`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch GMart provider');
+  }
+  const providers: GMartProvider[] = await res.json();
+  // Hum assume kar rahe hain ki GMart ka ek hi official provider hai
+  return providers[0]; 
+};
+
+// API function grocery products fetch karne ke liye (ab providerId lega)
+const fetchGroceryProducts = async ({ queryKey }: { queryKey: [string, string | undefined, string] }): Promise<GroceryProduct[]> => {
+  const [, providerId, search] = queryKey;
+
+  if (!providerId) {
+    // Agar providerId nahi hai, toh fetch mat karo
+    return [];
+  }
+
+  const url = `/api/grocery-products?providerId=${providerId}&${search ? `search=${search}` : ''}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error('Failed to fetch grocery products');
@@ -51,28 +69,60 @@ const fetchGroceryProducts = async ({ queryKey }: { queryKey: (string | { catego
   return res.json();
 };
 
+// --- YEH HAI NAYA LOADING COMPONENT ---
+function GMartLoading() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+      {[...Array(8)].map((_, i) => (
+        <Card key={i} className="animate-pulse">
+          <div className="aspect-square bg-muted"></div>
+          <CardContent className="p-3">
+            <div className="h-4 bg-muted rounded mb-2"></div>
+            <div className="h-3 bg-muted rounded mb-2"></div>
+            <div className="flex justify-between items-center">
+              <div className="h-4 bg-muted rounded w-16"></div>
+              <div className="w-8 h-8 bg-muted rounded-full"></div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function Grocery() {
   const [, setLocation] = useLocation();
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>(""); // Yeh abhi sirf UI ke liye hai
   const [searchQuery, setSearchQuery] = useState("");
-  // --- BADLAV: useCart ki jagah useCartStore se items, addItem, updateQuantity, getTotalPrice liya ---
   const { items, addItem, updateQuantity, getTotalPrice } = useCartStore();
-  const { toast } = useToast(); // useToast ko use karenge
+  const { toast } = useToast();
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["groceryProducts", { category: selectedCategory, search: searchQuery }],
-    queryFn: fetchGroceryProducts, // fetchGroceryProducts ko directly pass kiya
+  // --- STEP 1: GMart Provider ko fetch karo ---
+  const { data: gmartProvider, isLoading: isLoadingProvider } = useQuery({
+    queryKey: ["gmartProvider"],
+    queryFn: fetchGmartProvider,
+  });
+
+  const gmartProviderId = gmartProvider?.id;
+
+  // --- STEP 2: Provider ID milne ke baad hi products fetch karo ---
+  const { data: products, isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["groceryProducts", gmartProviderId, searchQuery],
+    queryFn: fetchGroceryProducts,
+    enabled: !!gmartProviderId, // Yeh query tabhi chalegi jab providerId mil jayega
   });
 
   const handleCategorySelect = (categorySlug: string) => {
     setSelectedCategory(selectedCategory === categorySlug ? "" : categorySlug);
+    // TODO: Ab category select pe client-side filter kar sakte hain,
+    // ya backend API ko update kar sakte hain ki woh providerId + category dono le.
+    // Abhi ke liye, yeh sirf UI highlight karega.
   };
 
-  const handleAddToCart = (product: any) => {
-    // Check if the item is already in the cart. If yes, update quantity instead of adding new.
+  const handleAddToCart = (product: GroceryProduct) => {
     const existingItem = items.find(item => item.id === product.id);
     if (existingItem) {
-      updateQuantity(product.id, 1); // Increase quantity by 1
+      updateQuantity(product.id, 1);
       toast({
         title: "➕ Quantity Updated!",
         description: `${product.name} quantity increased to ${existingItem.quantity + 1}.`,
@@ -82,11 +132,8 @@ export default function Grocery() {
         id: product.id,
         name: product.name,
         price: parseFloat(product.price),
-        // --- BADLAV: `weight` prop ko ab bhi yahan se remove kiya hai,
-        //             kyunki useCartStore me weight nahi hai.
-        //             Agar chahiye, toh useCartStore ke CartItem type me add karna hoga.
-        // weight: product.weight,
-        imageUrl: product.imageUrl,
+        imageUrl: product.imageUrl || undefined,
+        quantity: 1, // Store 'quantity' 1 se start karega
       });
       toast({
         title: "✅ Added to Cart!",
@@ -95,10 +142,14 @@ export default function Grocery() {
     }
   };
 
+  // Filtered products (client-side category filter)
+  const filteredProducts = products
+    ? products.filter(product => 
+        selectedCategory ? product.category === selectedCategory : true
+      )
+    : [];
 
-  // --- BADLAV: getTotalItems aur getSubtotal ki ab zaroorat nahi, useCartStore ke functions use honge ---
-  // const getTotalItems = () => { /* ... */ };
-  // const getSubtotal = () => { /* ... */ };
+  const isLoading = isLoadingProvider || isLoadingProducts;
 
   return (
     <div className="py-16 bg-background">
@@ -108,7 +159,6 @@ export default function Grocery() {
           variant="ghost"
           className="mb-6 flex items-center space-x-2"
           onClick={() => setLocation("/")}
-          data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Back to Services</span>
@@ -116,8 +166,13 @@ export default function Grocery() {
 
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold mb-2">GMart Grocery</h2>
-            <p className="text-muted-foreground">Fresh groceries delivered to your doorstep</p>
+            {/* Ab provider ka naam dikha sakte hain */}
+            <h2 className="text-3xl font-bold mb-2">
+              {gmartProvider ? gmartProvider.businessName : "GMart Grocery"}
+            </h2>
+            <p className="text-muted-foreground">
+              {gmartProvider ? gmartProvider.description : "Fresh groceries..."}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Delivery Charges</p>
@@ -135,7 +190,6 @@ export default function Grocery() {
                   variant={selectedCategory === category.slug ? "default" : "ghost"}
                   className="flex-shrink-0 flex flex-col items-center p-3 h-auto"
                   onClick={() => handleCategorySelect(category.slug)}
-                  data-testid={`category-${category.slug}`}
                 >
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
                     selectedCategory === category.slug
@@ -165,7 +219,6 @@ export default function Grocery() {
               className="pl-12"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search"
             />
           </div>
           <Button variant="outline" className="flex items-center space-x-2">
@@ -175,59 +228,42 @@ export default function Grocery() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-          {isLoading ? (
-            // Loading Skeletons
-            [...Array(8)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="aspect-square bg-muted"></div>
-                <CardContent className="p-3">
-                  <div className="h-4 bg-muted rounded mb-2"></div>
-                  <div className="h-3 bg-muted rounded mb-2"></div>
-                  <div className="flex justify-between items-center">
-                    <div className="h-4 bg-muted rounded w-16"></div>
-                    <div className="w-8 h-8 bg-muted rounded-full"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : products?.length === 0 ? (
-            // No Products Found Message
-            <Card className="col-span-full">
-              <CardContent className="p-8 text-center">
-                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No products found</h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or category filters.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            // Actual Product Cards
-            products?.map((product: any) => (
+        {isLoading ? (
+          <GMartLoading />
+        ) : filteredProducts.length === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="p-8 text-center">
+              <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No products found</h3>
+              <p className="text-muted-foreground">
+                {searchQuery ? 'Try a different search term' : 'Try selecting a different category or clearing filters.'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+            {filteredProducts.map((product: GroceryProduct) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 onAddToCart={() => handleAddToCart(product)}
-                // --- BADLAV: Quantity prop add kiya ProductCard me ---
                 quantity={items.find(item => item.id === product.id)?.quantity || 0}
                 onIncreaseQuantity={() => updateQuantity(product.id, 1)}
                 onDecreaseQuantity={() => updateQuantity(product.id, -1)}
               />
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {/* --- BADLAV: Cart Summary Component (Inline) --- */}
-        {/* Ab hum useCartStore ke items aur functions ko use karenge */}
+        {/* Cart Summary (neeche waala bar) */}
         {items.length > 0 && (
-          <div className="fixed bottom-0 left-0 right-0 bg-card p-4 shadow-lg border-t z-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-card p-4 shadow-lg border-t z-50 animate-slide-up-fast">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
               <div>
                 <p className="text-sm text-muted-foreground">{items.reduce((total, item) => total + item.quantity, 0)} Items</p>
                 <p className="text-xl font-bold">₹{getTotalPrice().toFixed(2)}</p>
               </div>
-              <Button onClick={() => setLocation("/checkout")}>
+              <Button onClick={() => setLocation("/checkout")} size="lg">
                 Proceed to Checkout
                 <ShoppingBag className="ml-2 h-5 w-5" />
               </Button>

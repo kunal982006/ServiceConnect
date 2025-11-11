@@ -13,8 +13,16 @@ import {
   Briefcase, 
   CheckCircle2,
   Clock,
-  Phone
+  Phone,
+  Loader2
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import type { ServiceProvider, ServiceProblem, User, ServiceCategory } from "@shared/schema";
+
+type ElectricianProviderDetail = ServiceProvider & { 
+  user: User; 
+  category: ServiceCategory; 
+};
 
 export default function ElectricianDetail() {
   const [, setLocation] = useLocation();
@@ -24,35 +32,22 @@ export default function ElectricianDetail() {
 
   const providerId = params?.id;
 
-  // Get electrician details
-  const { data: provider, isLoading } = useQuery({
-    queryKey: ["/api/service-providers", providerId],
+  // Get electrician details (FIXED)
+  const { data: provider, isLoading } = useQuery<ElectricianProviderDetail>({
+    queryKey: ["service-provider-detail", providerId],
+    queryFn: () => 
+      apiRequest("GET", `/api/service-providers/${providerId}`)
+        .then(res => res.json()),
     enabled: !!providerId,
   });
 
-  // Get electrician category
-  const { data: categories } = useQuery({
-    queryKey: ["/api/service-categories"],
-  });
-
-  const electricianCategory = categories?.find(
-    (cat: any) => cat.slug === "electrician"
-  );
-
-  // Get all appliances (parent problems)
-  const { data: appliances } = useQuery({
-    queryKey: ["/api/service-problems", electricianCategory?.id],
-    enabled: !!electricianCategory?.id,
-  });
-
-  // Get all problems for all appliances
-  const { data: allProblems } = useQuery({
-    queryKey: ["/api/service-problems", electricianCategory?.id, "all"],
-    enabled: !!electricianCategory?.id,
-    select: (data) => {
-      // This will get parent problems, we need to get child problems separately
-      return data;
-    },
+  // Get all appliances (parent problems) (FIXED)
+  const { data: appliances, isLoading: appliancesLoading } = useQuery<ServiceProblem[]>({
+    queryKey: ["service-problems", "electrician"],
+    queryFn: () => 
+      apiRequest("GET", "/api/service-problems?category=electrician")
+        .then(res => res.json()),
+    enabled: !!provider, // Jab provider load ho jaye tab
   });
 
   const handleProblemSelect = (problemId: string, problemName: string) => {
@@ -63,8 +58,9 @@ export default function ElectricianDetail() {
   if (isLoading) {
     return (
       <div className="py-16 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-muted-foreground">Loading...</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="text-muted-foreground mt-2">Loading...</p>
         </div>
       </div>
     );
@@ -75,7 +71,7 @@ export default function ElectricianDetail() {
       <div className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-muted-foreground">
-            Electrician not found
+            Technician not found
           </p>
         </div>
       </div>
@@ -93,7 +89,7 @@ export default function ElectricianDetail() {
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Electricians</span>
+          <span>Back to Technicians</span>
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -173,7 +169,7 @@ export default function ElectricianDetail() {
                 {/* Contact Button */}
                 <Button className="w-full" disabled={!provider.isAvailable}>
                   <Phone className="h-4 w-4 mr-2" />
-                  Contact Electrician
+                  Contact Technician
                 </Button>
               </CardContent>
             </Card>
@@ -189,13 +185,17 @@ export default function ElectricianDetail() {
                 </p>
               </CardHeader>
               <CardContent>
-                {appliances && appliances.length > 0 ? (
+                {appliancesLoading ? (
+                   <p className="text-center text-muted-foreground py-8">Loading problems...</p>
+                ) : appliances && appliances.length > 0 ? (
                   <div className="space-y-6">
-                    {appliances.map((appliance: any) => (
+                    {/* Sirf wohi appliances dikhao jo provider specialize karta hai */}
+                    {appliances
+                      .filter(appliance => provider.specializations?.includes(appliance.name))
+                      .map((appliance: any) => (
                       <ApplianceProblems
                         key={appliance.id}
                         appliance={appliance}
-                        electricianCategoryId={electricianCategory?.id}
                         selectedProblemId={selectedProblem?.id || ""}
                         onProblemSelect={handleProblemSelect}
                       />
@@ -215,7 +215,7 @@ export default function ElectricianDetail() {
                 <CardHeader>
                   <CardTitle>Book a Service Slot</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Choose your preferred date and time
+                    You selected: <span className="text-primary font-medium">{selectedProblem.name}</span>
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -238,30 +238,27 @@ export default function ElectricianDetail() {
   );
 }
 
-// Component to display problems for each appliance
+// Component to display problems for each appliance (FIXED)
 function ApplianceProblems({
   appliance,
-  electricianCategoryId,
   selectedProblemId,
   onProblemSelect,
 }: {
-  appliance: any;
-  electricianCategoryId: string;
+  appliance: ServiceProblem;
   selectedProblemId: string;
   onProblemSelect: (problemId: string, problemName: string) => void;
 }) {
-  const { data: problems } = useQuery({
+  // Child problems fetch karo (FIXED)
+  const { data: problems, isLoading } = useQuery<ServiceProblem[]>({
     queryKey: [
-      "/api/service-problems",
-      electricianCategoryId,
-      appliance.id,
+      "service-problems",
+      "electrician",
+      appliance.id, // Parent ID
     ],
-    queryFn: async () => {
-      const res = await fetch(`/api/service-problems/${electricianCategoryId}?parentId=${appliance.id}`);
-      if (!res.ok) throw new Error("Failed to fetch problems");
-      return res.json();
-    },
-    enabled: !!electricianCategoryId && !!appliance.id,
+    queryFn: () => 
+      apiRequest("GET", `/api/service-problems?category=electrician&parentId=${appliance.id}`)
+        .then(res => res.json()),
+    enabled: !!appliance.id,
   });
 
   return (
@@ -270,17 +267,21 @@ function ApplianceProblems({
         {appliance.name}
       </h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {problems?.map((problem: any) => (
-          <Button
-            key={problem.id}
-            variant={selectedProblemId === problem.id ? "default" : "outline"}
-            className="justify-start"
-            onClick={() => onProblemSelect(problem.id, problem.name)}
-            data-testid={`button-problem-${problem.id}`}
-          >
-            {problem.name}
-          </Button>
-        ))}
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading issues...</p>
+        ) : (
+          problems?.map((problem: any) => (
+            <Button
+              key={problem.id}
+              variant={selectedProblemId === problem.id ? "default" : "outline"}
+              className="justify-start"
+              onClick={() => onProblemSelect(problem.id, problem.name)}
+              data-testid={`button-problem-${problem.id}`}
+            >
+              {problem.name}
+            </Button>
+          ))
+        )}
       </div>
     </div>
   );

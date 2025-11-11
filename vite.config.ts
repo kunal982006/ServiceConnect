@@ -20,11 +20,24 @@ export default defineConfig({
       : []),
   ],
   resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-    },
+    // --- YEH RAHA FIX ---
+    // Humne alias syntax ko object se array mein change kar diya hai
+    // Yeh zyada reliable hai
+    alias: [
+      { 
+        find: "@", 
+        replacement: path.resolve(import.meta.dirname, "client/src") 
+      },
+      { 
+        find: "@shared", 
+        replacement: path.resolve(import.meta.dirname, "shared") 
+      },
+      { 
+        find: "@assets", 
+        replacement: path.resolve(import.meta.dirname, "attached_assets") 
+      },
+    ],
+    // --- FIX KHATAM ---
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {

@@ -73,3 +73,30 @@ export async function sendBookingNotification(
     throw error;
   }
 }
+
+// --- YEH NAYA FUNCTION ADD KIYA HAI ---
+/**
+ * Customer ko Service OTP SMS se bhejta hai
+ */
+export async function sendOtpNotification(
+  to: string,
+  otp: string
+) {
+  try {
+    const client = await getTwilioClient();
+    const fromNumber = await getTwilioFromPhoneNumber();
+
+    const message = `Your service OTP for Shirur Express is ${otp}. Please share this with your technician to complete the service.`;
+
+    const result = await client.messages.create({
+      body: message,
+      from: fromNumber,
+      to: to
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error sending OTP SMS:', error);
+    throw error;
+  }
+}

@@ -1,4 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+// client/src/pages/my-bookings.tsx (UPDATED & COMPLETE)
+
+import { useQuery, useMutation, useQueryClient } // <-- ADD KIYA GAYA
+from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +13,54 @@ import {
   Clock, 
   Phone,
   MapPin,
-  AlertCircle 
+  AlertCircle,
+  Loader2 // <-- ADD KIYA GAYA
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast"; // <-- ADD KIYA GAYA
+import api from "@/lib/api"; // <-- ADD KIYA GAYA (Assuming tumhara api client yahaan hai)
 
 export default function MyBookings() {
   const { user } = useAuth();
   const userId = user?.id;
 
+  // --- YEH SAB ADD KIYA GAYA ---
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // API se data fetch karne ka logic (assuming queryKey hi endpoint hai tumhare setup mein)
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["/api/bookings/user", userId],
+    queryFn: async () => { // Maine queryFn add kar diya hai best practice ke liye
+      if (!userId) return [];
+      const res = await api.get("/api/bookings/user"); // Assume karo yeh user-specific route hai
+      return res.data;
+    },
+    enabled: !!userId,
   });
+
+  // Booking cancel karne ke liye mutation
+  const cancelBookingMutation = useMutation({
+    mutationFn: (bookingId: string) => {
+      return api.patch(`/api/bookings/${bookingId}/cancel`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Booking Cancelled",
+        description: "Your service request has been successfully cancelled.",
+      });
+      // Bookings ki list ko refresh karo
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings/user", userId] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancellation Failed",
+        description: error.response?.data?.message || "Could not cancel booking.",
+        variant: "destructive",
+      });
+    },
+  });
+  // --- ADD KARNA KHATAM ---
+
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; variant: any; icon: any; description: string }> = {
@@ -46,6 +87,13 @@ export default function MyBookings() {
         variant: "outline", 
         icon: CheckCircle,
         description: "Service completed" 
+      },
+      // --- YEH NAYA STATUS ADD KIYA GAYA ---
+      cancelled: { 
+        label: "Cancelled", 
+        variant: "destructive", 
+        icon: XCircle,
+        description: "You cancelled this request" 
       },
     };
 
@@ -101,6 +149,7 @@ export default function MyBookings() {
                 className={
                   booking.status === "accepted" ? "border-l-4 border-l-green-500" :
                   booking.status === "declined" ? "border-l-4 border-l-red-500" :
+                  booking.status === "cancelled" ? "border-l-4 border-l-red-500" : // <-- ADD KIYA GAYA
                   booking.status === "pending" ? "border-l-4 border-l-yellow-500" : ""
                 }
               >
@@ -172,8 +221,27 @@ export default function MyBookings() {
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className="text-right w-[150px] flex-shrink-0">
                       {getStatusBadge(booking.status)}
+
+                      {/* --- YEH POORA BUTTON BLOCK ADD KIYA GAYA --- */}
+                      {booking.status === 'pending' && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="mt-3 w-full"
+                          onClick={() => cancelBookingMutation.mutate(booking.id)}
+                          disabled={cancelBookingMutation.isPending && cancelBookingMutation.variables === booking.id}
+                        >
+                          {cancelBookingMutation.isPending && cancelBookingMutation.variables === booking.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            "Cancel Booking"
+                          )}
+                        </Button>
+                      )}
+                      {/* --- ADD KARNA KHATAM --- */}
+
                     </div>
                   </div>
                 </CardHeader>

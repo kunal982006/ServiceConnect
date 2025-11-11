@@ -4,262 +4,254 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { 
-Select, 
-SelectContent, 
-SelectItem, 
-SelectTrigger, 
-SelectValue 
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from "@/components/ui/select";
 import ProviderCard from "@/components/provider-card";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient"; // Asli API request function import kiya
+import type { ServiceProvider, ServiceProblem, User, ServiceCategory } from "@shared/schema";
 
-// NOTE: Yeh dummy fetch function hai. Tumhe asli fetch function use karna padega.
-// Lekin query keys correct hone se TanStack Query sahi kaam karega.
-const fetcher = async (url: string, params?: Record<string, any>) => {
-    // Tumhara actual fetch logic yahan aayega, jo URL aur params ko use karega
-    const query = new URLSearchParams(params).toString();
-    const finalUrl = query ? `${url}?${query}` : url;
-    // For now, returning dummy data if possible
-    return fetch(finalUrl).then(res => res.json());
-};
-
+// Types define kiye
+type ElectricianProvider = ServiceProvider & { user: User; category: ServiceCategory };
 
 export default function Electrician() {
-const [, setLocation] = useLocation();
-const [searchQuery, setSearchQuery] = useState("");
-const [selectedAppliance, setSelectedAppliance] = useState("");
-const [selectedProblem, setSelectedProblem] = useState("");
+  const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAppliance, setSelectedAppliance] = useState("");
+  const [selectedProblem, setSelectedProblem] = useState("");
 
-// 1. Get ALL categories to find the electrician ID
-// Query Key FIX: Array of URL and parameters for stability
-const { data: categories } = useQuery({
-queryKey: ["service-categories", "/api/service-categories"], 
-    queryFn: () => fetcher("/api/service-categories"),
-});
+  // 1. Get all electricians (Profiles)
+  const { data: providers, isLoading: providersLoading } = useQuery<ElectricianProvider[]>({
+    queryKey: ["service-providers", "electrician"],
+    queryFn: () => 
+      apiRequest("GET", "/api/service-providers?category=electrician")
+        .then(res => res.json()),
+  });
 
-const electricianCategory = categories?.find(
-(cat: any) => cat.slug === "electrician"
-);
+  // 2. Get appliance categories (Parent Problems)
+  const { data: appliances, isLoading: appliancesLoading } = useQuery<ServiceProblem[]>({
+    queryKey: ["service-problems", "electrician"],
+    queryFn: () => 
+      apiRequest("GET", "/api/service-problems?category=electrician")
+        .then(res => res.json()),
+    // Yeh hamesha enabled rahega
+  });
 
-  // Extracting Category ID for other calls
-  const categoryId = electricianCategory?.id;
+  // 3. Get problems for selected appliance (Child Problems)
+  const { data: problems, isLoading: problemsLoading } = useQuery<ServiceProblem[]>({
+    queryKey: ["service-problems", "electrician", selectedAppliance],
+    queryFn: () => 
+      apiRequest("GET", `/api/service-problems?category=electrician&parentId=${selectedAppliance}`)
+        .then(res => res.json()),
+    enabled: !!selectedAppliance, // Jab selectedAppliance ho tabhi chalao
+  });
 
+  // Filter providers based on search and selected problem/appliance
+  const filteredProviders = useMemo(() => {
+    if (!providers) return [];
 
-// 2. Get all electricians (Profiles)
-// FIX: Dummy data load karne ke liye koi location filters pass mat karo
-// agar providers nahi dikh rahe hain, toh isse woh mil jayenge.
-const { data: providers, isLoading: providersLoading } = useQuery({
-queryKey: ["service-providers", "electrician"],
-    queryFn: () => fetcher("/api/service-providers", { category: "electrician" }),
-});
+    let filtered = providers;
 
-// 3. Get appliance categories (Parent Problems)
-// FIX: Query key ko object format mein rakho, aur categoryId pass karo
-const { data: appliances } = useQuery({
-queryKey: ["service-problems-appliances", categoryId],
-    queryFn: () => fetcher(`/api/service-problems/${categoryId}`),
-enabled: !!categoryId, // Jab categoryId mil jaye tabhi chalao
-});
+    // Search filter
+    if (searchQuery) {
+      filtered = filtered.filter((provider) =>
+        provider.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        provider.address?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
 
-// 4. Get problems for selected appliance (Child Problems)
-// FIX: Query key mein parentId ko alag se pass karo
-// FIX: fetcher function ko correct parameters do, jisse woh parentId ko as query param bhejega
-const { data: problems } = useQuery({
-queryKey: ["service-problems-issues", categoryId, selectedAppliance],
-queryFn: () => fetcher(`/api/service-problems/${categoryId}`, { parentId: selectedAppliance }),
-enabled: !!categoryId && !!selectedAppliance, // Jab categoryId aur selectedAppliance dono ho tabhi chalao
-});
+    // Specialization (Appliance) filter
+    if (selectedAppliance) {
+      const applianceName = appliances?.find(a => a.id === selectedAppliance)?.name;
+      if (applianceName) {
+        filtered = filtered.filter(provider => 
+          provider.specializations?.includes(applianceName)
+        );
+      }
+    }
 
-// Filter providers based on search and selected problem
-const filteredProviders = useMemo(() => {
-if (!providers) return [];
+    // TODO: Problem-specific filter (agar backend support karta hai)
+    // Abhi ke liye, hum sirf appliance (specialization) se filter kar rahe hain
 
-let filtered = providers;
+    return filtered;
+  }, [providers, searchQuery, selectedAppliance, appliances]);
 
-// Search filter
-if (searchQuery) {
-filtered = filtered.filter((provider: any) =>
-provider.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-provider.address?.toLowerCase().includes(searchQuery.toLowerCase())
-);
-}
+  const handleApplianceChange = (value: string) => {
+    setSelectedAppliance(value);
+    setSelectedProblem(""); // Reset problem selection
+  };
 
-// TODO: Provider-problem relationship filtering logic yahan aayega
-// Jab tumhare backend mein providers ke paas unke specialization/problem IDs honge
+  return (
+    <div className="py-16 bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Back Button */}
+        <Button
+          variant="ghost"
+          className="mb-6 flex items-center space-x-2"
+          onClick={() => setLocation("/")}
+          data-testid="button-back"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Services</span>
+        </Button>
 
-return filtered;
-}, [providers, searchQuery, selectedProblem]);
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold mb-2">Find Technicians & Electricians</h2>
+          <p className="text-muted-foreground">
+            Search by name or filter by appliance and problem
+          </p>
+        </div>
 
-const handleApplianceChange = (value: string) => {
-setSelectedAppliance(value);
-setSelectedProblem(""); // Reset problem selection
-};
+        {/* Search and Filter Bar */}
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search electricians by name or location..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-electrician"
+                />
+              </div>
 
-return (
-<div className="py-16 bg-background">
-<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-{/* Back Button */}
-<Button
-variant="ghost"
-className="mb-6 flex items-center space-x-2"
-onClick={() => setLocation("/")}
-data-testid="button-back"
->
-<ArrowLeft className="h-4 w-4" />
-<span>Back to Services</span>
-</Button>
+              {/* Appliance and Problem Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Appliance Dropdown */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Select Appliance
+                  </label>
+                  <Select
+                    value={selectedAppliance}
+                    onValueChange={handleApplianceChange}
+                    disabled={appliancesLoading}
+                  >
+                    <SelectTrigger data-testid="select-appliance">
+                      <SelectValue placeholder={appliancesLoading ? "Loading..." : "Choose an appliance"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {appliances?.map((appliance: any) => (
+                        <SelectItem 
+                          key={appliance.id} 
+                          value={appliance.id}
+                          data-testid={`appliance-${appliance.id}`}
+                        >
+                          {appliance.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-<div className="mb-8">
-<h2 className="text-3xl font-bold mb-2">Find Electricians</h2>
-<p className="text-muted-foreground">
-Search by name or filter by appliance and problem
-</p>
-</div>
+                {/* Problem Dropdown */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Select Problem
+                  </label>
+                  <Select
+                    value={selectedProblem}
+                    onValueChange={setSelectedProblem}
+                    disabled={!selectedAppliance || problemsLoading}
+                  >
+                    <SelectTrigger data-testid="select-problem">
+                      <SelectValue placeholder={
+                        problemsLoading ? "Loading..." :
+                        selectedAppliance 
+                        ? "Choose a problem" 
+                        : "Select appliance first"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {problems?.map((problem: any) => (
+                        <SelectItem 
+                          key={problem.id} 
+                          value={problem.id}
+                          data-testid={`problem-${problem.id}`}
+                        >
+                          {problem.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-{/* Search and Filter Bar */}
-<Card className="mb-8">
-<CardContent className="p-6">
-<div className="space-y-4">
-{/* Search Bar */}
-<div className="relative">
-<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-<Input
-placeholder="Search electricians by name or location..."
-className="pl-10"
-value={searchQuery}
-onChange={(e) => setSearchQuery(e.target.value)}
-data-testid="input-search-electrician"
-/>
-</div>
+              {/* Active Filters Display */}
+              {(selectedAppliance || selectedProblem) && (
+                <div className="flex items-center gap-2 pt-2">
+                  <span className="text-sm text-muted-foreground">
+                    Active filters:
+                  </span>
+                  {selectedAppliance && (
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                      {appliances?.find((a: any) => a.id === selectedAppliance)?.name}
+                    </span>
+                  )}
+                  {selectedProblem && (
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                      {problems?.find((p: any) => p.id === selectedProblem)?.name}
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedAppliance("");
+                      setSelectedProblem("");
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-{/* Appliance and Problem Filters */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-{/* Appliance Dropdown */}
-<div>
-<label className="text-sm font-medium mb-2 block">
-Select Appliance
-</label>
-<Select
-value={selectedAppliance}
-onValueChange={handleApplianceChange}
->
-<SelectTrigger data-testid="select-appliance">
-<SelectValue placeholder="Choose an appliance" />
-</SelectTrigger>
-<SelectContent>
-{appliances?.map((appliance: any) => (
-<SelectItem 
-key={appliance.id} 
-value={appliance.id}
-data-testid={`appliance-${appliance.id}`}
->
-{appliance.name}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
+        {/* Electricians List */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">
+            Available Technicians ({filteredProviders?.length || 0})
+          </h3>
 
-{/* Problem Dropdown */}
-<div>
-<label className="text-sm font-medium mb-2 block">
-Select Problem
-</label>
-<Select
-value={selectedProblem}
-onValueChange={setSelectedProblem}
-disabled={!selectedAppliance}
->
-<SelectTrigger data-testid="select-problem">
-<SelectValue placeholder={
-selectedAppliance 
-? "Choose a problem" 
-: "Select appliance first"
-} />
-</SelectTrigger>
-<SelectContent>
-{/* FIX: Problems yahan se load honge */}
-{problems?.map((problem: any) => (
-<SelectItem 
-key={problem.id} 
-value={problem.id}
-data-testid={`problem-${problem.id}`}
->
-{problem.name}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-</div>
-
-{/* Active Filters Display */}
-{(selectedAppliance || selectedProblem) && (
-<div className="flex items-center gap-2 pt-2">
-<span className="text-sm text-muted-foreground">
-Active filters:
-</span>
-{selectedAppliance && (
-<span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-{appliances?.find((a: any) => a.id === selectedAppliance)?.name}
-</span>
-)}
-{selectedProblem && (
-<span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-{problems?.find((p: any) => p.id === selectedProblem)?.name}
-</span>
-)}
-<Button
-variant="ghost"
-size="sm"
-onClick={() => {
-setSelectedAppliance("");
-setSelectedProblem("");
-}}
-data-testid="button-clear-filters"
->
-Clear filters
-</Button>
-</div>
-)}
-</div>
-</CardContent>
-</Card>
-
-{/* Electricians List */}
-<div>
-<h3 className="text-xl font-semibold mb-4">
-Available Electricians ({filteredProviders?.length || 0})
-</h3>
-
-{providersLoading ? (
-<div className="text-center py-12">
-<p className="text-muted-foreground">Loading electricians...</p>
-</div>
-) : filteredProviders?.length === 0 ? (
-<Card>
-<CardContent className="py-12 text-center">
-<p className="text-muted-foreground">
-No electricians found. Try adjusting your filters.
-</p>
-</CardContent>
-</Card>
-) : (
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-{filteredProviders?.map((provider: any) => (
-<ProviderCard
-key={provider.id}
-provider={provider}
-// onClick handlers ko theek kiya
-onCallRequest={() => setLocation(`/bookings/new?providerId=${provider.id}&service=call`)}
-onSchedule={() => setLocation(`/bookings/new?providerId=${provider.id}&service=schedule`)}
-/>
-))}
-</div>
-)}
-</div>
-</div>
-</div>
-);
+          {providersLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+              <p className="text-muted-foreground mt-2">Loading technicians...</p>
+            </div>
+          ) : filteredProviders?.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">
+                  No technicians found. Try adjusting your filters.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProviders?.map((provider: any) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  // onClick handlers ko theek kiya
+                  onCallRequest={() => setLocation(`/electrician/${provider.id}`)}
+                  onSchedule={() => setLocation(`/electrician/${provider.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

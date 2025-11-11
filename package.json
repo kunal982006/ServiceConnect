@@ -11,7 +11,7 @@
     "check": "tsc",
     "seed": "tsx server/seed.ts",
     "seed:electrician": "tsx server/seed-electrician-problems.ts",
-    "db:push": "drizzle-kit push:pg --force"
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -58,6 +58,7 @@
     "cmdk": "^1.1.1",
     "connect-pg-simple": "^10.0.0",
     "date-fns": "^3.6.0",
+    "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.39.1",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
@@ -72,6 +73,7 @@
     "next-themes": "^0.4.6",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "razorpay": "^2.9.6",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
@@ -110,7 +112,6 @@
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^10.0.0",
-    "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",

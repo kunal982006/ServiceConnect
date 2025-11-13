@@ -20,6 +20,7 @@ import Restaurants from "@/pages/restaurants";
 import Checkout from "@/pages/checkout";
 import ProviderDashboard from "@/pages/provider-dashboard";
 import MyBookings from "@/pages/my-bookings";
+import InvoicePayment from "@/pages/invoice-payment";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ProviderOnboarding from "@/pages/provider-onboarding";
@@ -51,6 +52,7 @@ function RouterComponent() {
       <Route path="/provider/dashboard" component={ProviderDashboard} />
 
       <Route path="/my-bookings" component={MyBookings} />
+      <Route path="/pay/invoice/:id" component={InvoicePayment} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/provider-onboarding" component={ProviderOnboarding} />

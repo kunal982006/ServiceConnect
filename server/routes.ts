@@ -286,6 +286,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/customer/my-bookings", isLoggedIn, async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+      const bookings = await storage.getUserBookings(userId);
+      res.json(bookings);
+    } catch (error: any) {
+      console.error("Get customer bookings error:", error);
+      res.status(500).json({ message: error.message || "Error fetching customer bookings" });
+    }
+  });
+
   // --- GENERAL SERVICE ROUTES (No Change) ---
   app.get("/api/service-categories", async (_req: Request, res: Response) => {
     try {

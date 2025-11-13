@@ -114,6 +114,7 @@ export default function ProviderCard({
                 </div>
               )}
             </div>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -1,7 +1,5 @@
-// client/src/pages/my-bookings.tsx (UPDATED & COMPLETE)
-
-import { useQuery, useMutation, useQueryClient } // <-- ADD KIYA GAYA
-from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,111 +9,141 @@ import {
   CheckCircle, 
   XCircle, 
   Clock, 
-  Phone,
   MapPin,
   AlertCircle,
-  Loader2 // <-- ADD KIYA GAYA
+  Loader2,
+  DollarSign,
+  Wrench
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast"; // <-- ADD KIYA GAYA
-import api from "@/lib/api"; // <-- ADD KIYA GAYA (Assuming tumhara api client yahaan hai)
+import { apiRequest } from "@/lib/queryClient";
+
+type BookingWithDetails = {
+  id: string;
+  status: string;
+  scheduledAt?: string;
+  userAddress: string;
+  userPhone: string;
+  notes?: string;
+  preferredTimeSlots?: string[];
+  invoice?: {
+    id: string;
+    totalAmount: number;
+    serviceCharge: number;
+    spareParts?: Array<{ part: string; cost: number }>;
+  };
+  problem?: {
+    name: string;
+  };
+  provider?: {
+    businessName: string;
+    user?: {
+      username: string;
+    };
+  };
+};
 
 export default function MyBookings() {
-  const { user } = useAuth();
-  const userId = user?.id;
+  const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
 
-  // --- YEH SAB ADD KIYA GAYA ---
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  // API se data fetch karne ka logic (assuming queryKey hi endpoint hai tumhare setup mein)
-  const { data: bookings, isLoading } = useQuery({
-    queryKey: ["/api/bookings/user", userId],
-    queryFn: async () => { // Maine queryFn add kar diya hai best practice ke liye
-      if (!userId) return [];
-      const res = await api.get("/api/bookings/user"); // Assume karo yeh user-specific route hai
-      return res.data;
+  const { data: bookings, isLoading } = useQuery<BookingWithDetails[]>({
+    queryKey: ["/api/customer/my-bookings"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/customer/my-bookings");
+      return response.json();
     },
-    enabled: !!userId,
+    enabled: !!user && isAuthenticated,
   });
 
-  // Booking cancel karne ke liye mutation
-  const cancelBookingMutation = useMutation({
-    mutationFn: (bookingId: string) => {
-      return api.patch(`/api/bookings/${bookingId}/cancel`);
-    },
-    onSuccess: () => {
-      toast({
-        title: "Booking Cancelled",
-        description: "Your service request has been successfully cancelled.",
-      });
-      // Bookings ki list ko refresh karo
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings/user", userId] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Cancellation Failed",
-        description: error.response?.data?.message || "Could not cancel booking.",
-        variant: "destructive",
-      });
-    },
-  });
-  // --- ADD KARNA KHATAM ---
-
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; variant: any; icon: any; description: string }> = {
+  const getStatusInfo = (status: string) => {
+    const statusConfig: Record<string, { label: string; variant: any; icon: any; description: string; color: string }> = {
       pending: { 
         label: "Pending", 
         variant: "secondary", 
         icon: Clock,
-        description: "Waiting for provider to accept" 
+        description: "Waiting for provider to accept...",
+        color: "border-yellow-500"
       },
       accepted: { 
         label: "Accepted", 
         variant: "default", 
         icon: CheckCircle,
-        description: "Provider accepted your request" 
+        description: "Provider has accepted! They are on their way.",
+        color: "border-green-500"
       },
-      declined: { 
-        label: "Declined", 
+      in_progress: { 
+        label: "In Progress", 
+        variant: "default", 
+        icon: Wrench,
+        description: "Service is currently in progress.",
+        color: "border-blue-500"
+      },
+      awaiting_otp: { 
+        label: "Awaiting OTP", 
+        variant: "outline", 
+        icon: Clock,
+        description: "Provider is completing the service.",
+        color: "border-blue-400"
+      },
+      awaiting_billing: { 
+        label: "Preparing Bill", 
+        variant: "outline", 
+        icon: Clock,
+        description: "Provider is creating your final bill.",
+        color: "border-blue-400"
+      },
+      pending_payment: { 
+        label: "Payment Due", 
         variant: "destructive", 
-        icon: XCircle,
-        description: "Provider declined this request" 
+        icon: DollarSign,
+        description: "Job complete! Your final bill is ready.",
+        color: "border-orange-500"
       },
       completed: { 
         label: "Completed", 
         variant: "outline", 
         icon: CheckCircle,
-        description: "Service completed" 
+        description: "Service completed successfully.",
+        color: "border-gray-400"
       },
-      // --- YEH NAYA STATUS ADD KIYA GAYA ---
+      declined: { 
+        label: "Declined", 
+        variant: "destructive", 
+        icon: XCircle,
+        description: "This request was declined.",
+        color: "border-red-500"
+      },
       cancelled: { 
         label: "Cancelled", 
         variant: "destructive", 
         icon: XCircle,
-        description: "You cancelled this request" 
+        description: "This request was cancelled.",
+        color: "border-red-500"
       },
     };
 
-    const config = statusConfig[status] || statusConfig.pending;
-    const Icon = config.icon;
+    return statusConfig[status] || statusConfig.pending;
+  };
 
+  if (!isAuthenticated) {
     return (
-      <div>
-        <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
-          <Icon className="h-3 w-3" />
-          {config.label}
-        </Badge>
-        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+      <div className="py-16 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Please Log In</h2>
+          <p className="text-muted-foreground mb-4">You need to be logged in to view your bookings</p>
+          <Button onClick={() => setLocation("/login")}>Log In</Button>
+        </div>
       </div>
     );
-  };
+  }
 
   if (isLoading) {
     return (
       <div className="py-16 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-muted-foreground">Loading your bookings...</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading your bookings...</p>
         </div>
       </div>
     );
@@ -135,118 +163,111 @@ export default function MyBookings() {
           <Card>
             <CardContent className="py-12 text-center">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">You haven't made any bookings yet</p>
-              <Button className="mt-4" onClick={() => window.location.href = '/electrician'}>
-                Book a Service
+              <p className="text-lg font-semibold mb-2">No bookings yet</p>
+              <p className="text-muted-foreground mb-4">Start by booking a service</p>
+              <Button onClick={() => setLocation("/electrician")}>
+                Find a Technician
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {bookings.map((booking: any) => (
-              <Card 
-                key={booking.id}
-                className={
-                  booking.status === "accepted" ? "border-l-4 border-l-green-500" :
-                  booking.status === "declined" ? "border-l-4 border-l-red-500" :
-                  booking.status === "cancelled" ? "border-l-4 border-l-red-500" : // <-- ADD KIYA GAYA
-                  booking.status === "pending" ? "border-l-4 border-l-yellow-500" : ""
-                }
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-2">
-                        {booking.problem?.name || "Service Request"}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {booking.provider?.businessName || "Provider"}
-                      </p>
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            {booking.scheduledAt 
-                              ? format(new Date(booking.scheduledAt), "EEEE, MMMM d, yyyy")
-                              : "Not scheduled"}
-                          </span>
+            {bookings.map((booking) => {
+              const statusInfo = getStatusInfo(booking.status);
+              const Icon = statusInfo.icon;
+
+              return (
+                <Card 
+                  key={booking.id}
+                  className={`border-l-4 ${statusInfo.color}`}
+                  data-testid={`booking-card-${booking.id}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-2">
+                          {booking.problem?.name || "Service Request"}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Provider: {booking.provider?.businessName || "N/A"}
+                        </p>
+                        
+                        <div className="space-y-2 text-sm">
+                          {booking.scheduledAt && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                {format(new Date(booking.scheduledAt), "EEEE, MMMM d, yyyy")}
+                              </span>
+                            </div>
+                          )}
+                          {booking.preferredTimeSlots && booking.preferredTimeSlots.length > 0 && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>Time: {booking.preferredTimeSlots[0]}</span>
+                            </div>
+                          )}
+                          <div className="flex items-start gap-2 text-muted-foreground">
+                            <MapPin className="h-4 w-4 mt-0.5" />
+                            <span>{booking.userAddress}</span>
+                          </div>
                         </div>
-                        {booking.preferredTimeSlots && booking.preferredTimeSlots.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            <span>Preferred time: {booking.preferredTimeSlots[0]}</span>
+
+                        {booking.notes && (
+                          <div className="mt-3 p-3 bg-muted rounded-md">
+                            <p className="text-sm font-medium mb-1">Your notes:</p>
+                            <p className="text-sm text-muted-foreground">{booking.notes}</p>
                           </div>
                         )}
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-4 w-4 mt-0.5" />
-                          <span>{booking.userAddress}</span>
-                        </div>
+
+                        {/* Status-specific messages */}
+                        {booking.status === "pending_payment" && booking.invoice && (
+                          <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                            <p className="text-sm font-bold text-orange-900 dark:text-orange-100 mb-2">
+                              💰 Job Complete! Your Final Bill is Ready
+                            </p>
+                            <div className="space-y-1 text-sm text-orange-700 dark:text-orange-300 mb-3">
+                              <p>Service Charge: ₹{booking.invoice.serviceCharge}</p>
+                              {booking.invoice.spareParts && booking.invoice.spareParts.length > 0 && (
+                                <div>
+                                  <p className="font-medium">Spare Parts:</p>
+                                  {booking.invoice.spareParts.map((part, idx) => (
+                                    <p key={idx} className="ml-3">
+                                      • {part.part}: ₹{part.cost}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="font-bold text-base mt-2">
+                                Total Bill: ₹{booking.invoice.totalAmount}
+                              </p>
+                            </div>
+                            <Button 
+                              className="w-full bg-orange-600 hover:bg-orange-700"
+                              onClick={() => setLocation(`/pay/invoice/${booking.invoice!.id}`)}
+                              data-testid="button-pay-now"
+                            >
+                              <DollarSign className="mr-2 h-4 w-4" />
+                              Pay Now - ₹{booking.invoice.totalAmount}
+                            </Button>
+                          </div>
+                        )}
                       </div>
-
-                      {booking.notes && (
-                        <div className="mt-3 p-3 bg-muted rounded-md">
-                          <p className="text-sm font-medium mb-1">Your notes:</p>
-                          <p className="text-sm">{booking.notes}</p>
-                        </div>
-                      )}
-
-                      {booking.status === "accepted" && (
-                        <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
-                            ✓ Booking Confirmed
-                          </p>
-                          <p className="text-sm text-green-700 dark:text-green-300">
-                            The provider will contact you soon on {booking.userPhone}
-                          </p>
-                        </div>
-                      )}
-
-                      {booking.status === "declined" && (
-                        <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                          <p className="text-sm font-medium text-red-900 dark:text-red-100 mb-2">
-                            ✗ Booking Declined
-                          </p>
-                          <p className="text-sm text-red-700 dark:text-red-300">
-                            Unfortunately, the provider couldn't accept this request. 
-                            Please try booking with another provider.
-                          </p>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="mt-3"
-                            onClick={() => window.location.href = '/electrician'}
-                          >
-                            Find Another Provider
-                          </Button>
-                        </div>
-                      )}
+                      
+                      <div className="text-right flex-shrink-0">
+                        <Badge variant={statusInfo.variant} className="flex items-center gap-1">
+                          <Icon className="h-3 w-3" />
+                          {statusInfo.label}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-2 max-w-[120px]">
+                          {statusInfo.description}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right w-[150px] flex-shrink-0">
-                      {getStatusBadge(booking.status)}
-
-                      {/* --- YEH POORA BUTTON BLOCK ADD KIYA GAYA --- */}
-                      {booking.status === 'pending' && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="mt-3 w-full"
-                          onClick={() => cancelBookingMutation.mutate(booking.id)}
-                          disabled={cancelBookingMutation.isPending && cancelBookingMutation.variables === booking.id}
-                        >
-                          {cancelBookingMutation.isPending && cancelBookingMutation.variables === booking.id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            "Cancel Booking"
-                          )}
-                        </Button>
-                      )}
-                      {/* --- ADD KARNA KHATAM --- */}
-
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-            ))}
+                  </CardHeader>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
